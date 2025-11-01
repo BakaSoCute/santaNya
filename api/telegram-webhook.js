@@ -1,5 +1,5 @@
 
-import { updateApplicationStatus, debugRedis } from '../lib/upstash-storage.js';
+import { updateApplicationStatus, debugRedis } from '../lib/vercel-redis-storage.js';
 
 export default async function handler(req, res) {
   // ... остальной код тот же
