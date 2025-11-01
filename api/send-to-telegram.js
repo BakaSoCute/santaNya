@@ -1,5 +1,4 @@
-import { debugStorage } from '../lib/storage.js';
-import { createApplication } from '../lib/kv-storage.js';
+import { createApplication, debugRedis } from '../lib/upstash-storage.js';
 
 export default async function handler(req, res) {
   // ... остальной код тот же, но использует file-storage
@@ -28,12 +27,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'No form data' });
     }
 
-    // Создаем заявку в общем хранилище
-    const application = createApplication(formData);
-    const applicationId = application.id;
-
     // Диагностика
-    debugStorage();
+    await debugRedis();
+    
+    // Создаем заявку
+    const application = await createApplication(formData);
+    const applicationId = application.id;
 
     // Отправляем в Telegram
     const message = `🎁 *НОВАЯ ЗАЯВКА #${applicationId}*\n\n` +
@@ -80,4 +79,5 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
