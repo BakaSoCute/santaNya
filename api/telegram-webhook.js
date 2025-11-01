@@ -1,5 +1,11 @@
-import { updateApplicationStatus, debugStorage } from '../lib/storage.js';
 
+import { updateApplicationStatus } from '../lib/kv-storage.js';
+
+export default async function handler(req, res) {
+  // ... остальной код тот же
+  const updated = await updateApplicationStatus(applicationId, action === 'approve' ? 'approved' : 'rejected', from.username || from.first_name);
+  // ...
+}
 export default async function handler(req, res) {
   console.log('🤖 Telegram webhook called');
   
