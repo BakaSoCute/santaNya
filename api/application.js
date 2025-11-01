@@ -1,5 +1,5 @@
 
-import { getApplication,getAllApplications } from '../lib/kv-storage.js';
+import { getApplication, getAllApplications, debugRedis } from '../lib/upstash-storage.js';
 
 export default async function handler(req, res) {
   console.log('📊 Application API called');
@@ -17,13 +17,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { searchParams } = new URL(req.url, `http://${req.headers.host}`);
-    const id = searchParams.get('id');
 
-    console.log(`🔍 Application ID requested: ${id}`);
     
     // Диагностика хранилища
-    debugStorage();
+   await debugRedis();
+    
+    const { searchParams } = new URL(req.url, `http://${req.headers.host}`);
+    const id = searchParams.get('id');
 
     if (id) {
       const application = getApplication(parseInt(id));
@@ -59,4 +59,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
+
 
