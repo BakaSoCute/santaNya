@@ -1,5 +1,4 @@
-// In-memory хранилище (должно быть таким же как в lib/applications.js)
-const applications = new Map();
+import { updateApplicationStatus, debugStorage } from '../lib/storage.js';
 
 export default async function handler(req, res) {
   console.log('🤖 Telegram webhook called');
@@ -17,17 +16,21 @@ export default async function handler(req, res) {
 
     console.log(`🔄 Processing ${action} for application ${applicationId}`);
 
-    // Обновляем статус в памяти
-    const application = applications.get(parseInt(applicationId));
-    
-    if (application) {
-      application.status = action === 'approve' ? 'approved' : 'rejected';
-      application.processedBy = from.username || from.first_name;
-      application.updatedAt = new Date().toISOString();
-      
-      console.log(`✅ Updated application ${applicationId} status to: ${application.status}`);
-    } else {
-      console.log(`❌ Application ${applicationId} not found in memory`);
+    // Диагностика перед обновлением
+    debugStorage();
+
+    // Обновляем статус в общем хранилище
+    const updated = updateApplicationStatus(
+      applicationId, 
+      action === 'approve' ? 'approved' : 'rejected',
+      from.username || from.first_name
+    );
+
+    // Диагностика после обновления
+    debugStorage();
+
+    if (!updated) {
+      console.log(`❌ Failed to update application ${applicationId}`);
     }
 
     // Отвечаем на callback
