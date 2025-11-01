@@ -1,5 +1,5 @@
 
-import { updateApplicationStatus } from '../lib/kv-storage.js';
+import { updateApplicationStatus, debugRedis } from '../lib/upstash-storage.js';
 
 export default async function handler(req, res) {
   // ... остальной код тот же
@@ -10,30 +10,31 @@ export default async function handler(req, res) {
   console.log('🤖 Telegram webhook called');
   
   try {
-    const { callback_query } = req.body;
-    console.log('Webhook data:', JSON.stringify(req.body, null, 2));
+    // const { callback_query } = req.body;
+    // console.log('Webhook data:', JSON.stringify(req.body, null, 2));
 
-    if (!callback_query) {
-      return res.status(200).json({ ok: true });
-    }
+    // if (!callback_query) {
+    //   return res.status(200).json({ ok: true });
+    // }
 
-    const { data, message, from } = callback_query;
-    const [action, applicationId] = data.split('_');
+    // const { data, message, from } = callback_query;
+    // const [action, applicationId] = data.split('_');
 
-    console.log(`🔄 Processing ${action} for application ${applicationId}`);
+    // console.log(`🔄 Processing ${action} for application ${applicationId}`);
 
     // Диагностика перед обновлением
-    debugStorage();
+    await debugRedis();
+    
+    const { callback_query } = req.body;
+    const [action, applicationId] = data.split('_');
 
     // Обновляем статус в общем хранилище
-    const updated = updateApplicationStatus(
+    const updated = await updateApplicationStatus(
       applicationId, 
       action === 'approve' ? 'approved' : 'rejected',
       from.username || from.first_name
     );
 
-    // Диагностика после обновления
-    debugStorage();
 
     if (!updated) {
       console.log(`❌ Failed to update application ${applicationId}`);
