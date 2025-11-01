@@ -1,4 +1,5 @@
-import { getApplication, getAllApplications, debugStorage } from '../lib/storage.js';
+
+import { getApplication,getAllApplications } from '../lib/kv-storage.js';
 
 export default async function handler(req, res) {
   console.log('📊 Application API called');
@@ -58,3 +59,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
+
