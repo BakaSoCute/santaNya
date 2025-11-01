@@ -23,17 +23,14 @@ export default async function handler(req, res) {
   try {
     const { formData } = req.body;
     
-    if (!formData) {
-      return res.status(400).json({ error: 'No form data' });
-    }
-
-    // Диагностика
+    // Диагностика Redis
     await debugRedis();
     
-    // Создаем заявку
+    // Создаем заявку в Redis
     const application = await createApplication(formData);
     const applicationId = application.id;
-
+    
+    console.log(`✅ Application ${applicationId} created in Redis`);
     // Отправляем в Telegram
     const message = `🎁 *НОВАЯ ЗАЯВКА #${applicationId}*\n\n` +
       `👤 *Twitch ник:* ${formData.fullName || 'Не указан'}\n` +
@@ -79,6 +76,7 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
 
 
