@@ -1,8 +1,7 @@
-// Используем то же хранилище
-const applications = new Map();
+import { getApplication, getAllApplications, debugStorage } from '../lib/storage.js';
 
 export default async function handler(req, res) {
-  console.log('📊 Application API called:', req.url);
+  console.log('📊 Application API called');
   
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -20,12 +19,13 @@ export default async function handler(req, res) {
     const { searchParams } = new URL(req.url, `http://${req.headers.host}`);
     const id = searchParams.get('id');
 
-    console.log(`🔍 Looking for application ID: ${id}`);
-    console.log(`📝 Total applications in memory: ${applications.size}`);
+    console.log(`🔍 Application ID requested: ${id}`);
+    
+    // Диагностика хранилища
+    debugStorage();
 
     if (id) {
-      const application = applications.get(parseInt(id));
-      console.log(`📄 Application ${id} found:`, application);
+      const application = getApplication(parseInt(id));
       
       if (application) {
         return res.json({ 
@@ -41,16 +41,15 @@ export default async function handler(req, res) {
           }
         });
       } else {
-        console.log(`❌ Application ${id} not found`);
+        console.log(`❌ Application ${id} not found in storage`);
         return res.status(404).json({ error: 'Application not found' });
       }
     } else {
-      // Возвращаем все заявки
-      const allApplications = Array.from(applications.values());
+      const applications = getAllApplications();
       return res.json({ 
         success: true, 
-        applications: allApplications,
-        total: allApplications.length
+        applications: applications,
+        total: applications.length
       });
     }
 
