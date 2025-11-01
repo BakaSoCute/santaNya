@@ -1,7 +1,7 @@
-import { updateApplicationStatus } from '../lib/vercel-redis-storage.js';
+import { updateApplicationStatus, getApplication, debugRedis } from '../lib/vercel-redis-storage.js';
 
 export default async function handler(req, res) {
-  console.log('🤖 Telegram webhook called');
+  console.log('🤖 Telegram webhook called - ENHANCED LOGGING');
   
   try {
     // Сразу возвращаем 200 чтобы Telegram не жаловался
@@ -32,7 +32,8 @@ export default async function handler(req, res) {
 
     console.log(`🔄 Action: ${action}, Application ID: ${applicationId}`);
 
-    // 1. Сразу отвечаем на callback
+    // 1. Сначала отвечаем на callback
+    console.log('📨 Answering callback query...');
     await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -42,11 +43,16 @@ export default async function handler(req, res) {
       }),
     });
 
-    // 2. Обновляем статус в Redis
+    // 2. ДИАГНОСТИКА: Проверяем текущий статус ДО обновления
+    console.log('🔍 Checking current application status BEFORE update...');
+    const currentApp = await getApplication(applicationId);
+    console.log('📄 Current application:', currentApp);
+
+    // 3. Обновляем статус в Redis
     const status = action === 'approve' ? 'approved' : 'rejected';
     const processedBy = from.username || from.first_name;
     
-    console.log(`📝 Updating application ${applicationId} to ${status}`);
+    console.log(`📝 Updating application ${applicationId} to ${status}...`);
     
     const updated = await updateApplicationStatus(applicationId, status, processedBy);
     
@@ -57,7 +63,17 @@ export default async function handler(req, res) {
 
     console.log(`✅ Application ${applicationId} updated to ${status}`);
 
-    // 3. Обновляем сообщение в Telegram
+    // 4. ДИАГНОСТИКА: Проверяем статус ПОСЛЕ обновления
+    console.log('🔍 Checking application status AFTER update...');
+    const verifiedApp = await getApplication(applicationId);
+    console.log('📄 Verified application:', verifiedApp);
+
+    // 5. ДИАГНОСТИКА: Проверяем Redis состояние
+    console.log('🔧 Checking Redis state...');
+    await debugRedis();
+
+    // 6. Обновляем сообщение в Telegram
+    console.log('✏️ Editing message in Telegram...');
     const statusEmoji = status === 'approved' ? '✅' : '❌';
     const statusText = status === 'approved' ? 'Одобрена' : 'Отклонена';
 
@@ -67,9 +83,10 @@ export default async function handler(req, res) {
       `💬 *Контакт:* ${updated.contactInfo}\n` +
       `⏰ *Время подачи:* ${new Date(updated.createdAt).toLocaleString('ru-RU')}\n` +
       `📊 *Статус:* ${statusEmoji} ${statusText}\n` +
-      `👤 *Обработал:* ${processedBy}`;
+      `👤 *Обработал:* ${processedBy}\n` +
+      `✅ *Обновлено в Redis:* ДА`;
 
-    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
+    const editResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -81,9 +98,13 @@ export default async function handler(req, res) {
       }),
     });
 
+    const editResult = await editResponse.json();
+    console.log('📝 Message edit result:', editResult.ok ? '✅ Success' : '❌ Failed');
+
     console.log(`✅ Successfully processed ${action} for application ${applicationId}`);
 
   } catch (error) {
     console.error('💥 Webhook error:', error);
+    console.error('💥 Error stack:', error.stack);
   }
 }
