@@ -1,5 +1,5 @@
 
-import { getApplication, getAllApplications, debugRedis } from '../lib/upstash-storage.js';
+import { getApplication, getAllApplications, debugRedis } from '../lib/vercel-redis-storage.js';
 
 export default async function handler(req, res) {
   console.log('📊 Application API called');
@@ -59,5 +59,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
+
 
 
