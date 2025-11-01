@@ -1,6 +1,4 @@
-// Используем то же хранилище что и в webhook
-const applications = new Map();
-let applicationCounter = 1;
+import { createApplication, debugStorage } from '../lib/storage.js';
 
 export default async function handler(req, res) {
   console.log('📨 Send to telegram called');
@@ -24,20 +22,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'No form data' });
     }
 
-    // Создаем заявку в том же хранилище
-    const applicationId = applicationCounter++;
-    const application = {
-      id: applicationId,
-      twitchName: formData.fullName,
-      contactMethod: formData.contactMethod,
-      contactInfo: formData.contactInfo,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    applications.set(applicationId, application);
-    console.log(`✅ Created application ${applicationId} in memory`);
+    // Создаем заявку в общем хранилище
+    const application = createApplication(formData);
+    const applicationId = application.id;
+
+    // Диагностика
+    debugStorage();
 
     // Отправляем в Telegram
     const message = `🎁 *НОВАЯ ЗАЯВКА #${applicationId}*\n\n` +
@@ -70,7 +60,9 @@ export default async function handler(req, res) {
         message: 'Заявка успешно отправлена в Telegram' 
       });
     } else {
-      applications.delete(applicationId);
+      // Откатываем создание заявки при ошибке
+      const { deleteApplication } = await import('../lib/storage.js');
+      deleteApplication(applicationId);
       throw new Error('Telegram API error');
     }
 
