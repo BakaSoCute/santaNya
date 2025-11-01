@@ -9,14 +9,15 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "dest": "/api/$1.js"
+    },
+    {
+      "src": "/health",
+      "dest": "/api/health.js"
     },
     {
       "src": "/(.*)",
-      "dest": "/api/health"
+      "dest": "/api/health.js"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }
