@@ -16,49 +16,32 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  try {
-
-    
-    // Диагностика хранилища
-   await debugRedis();
+    try {
+    // Диагностика Redis
+    await debugRedis();
     
     const { searchParams } = new URL(req.url, `http://${req.headers.host}`);
     const id = searchParams.get('id');
 
     if (id) {
-      const application = getApplication(parseInt(id));
+      const application = await getApplication(parseInt(id));
       
       if (application) {
-        return res.json({ 
-          success: true, 
-          application: {
-            id: application.id,
-            status: application.status,
-            twitchName: application.twitchName,
-            contactInfo: application.contactInfo,
-            createdAt: application.createdAt,
-            updatedAt: application.updatedAt,
-            processedBy: application.processedBy
-          }
-        });
+        res.json({ success: true, application });
       } else {
-        console.log(`❌ Application ${id} not found in storage`);
-        return res.status(404).json({ error: 'Application not found' });
+        res.status(404).json({ error: 'Application not found' });
       }
     } else {
-      const applications = getAllApplications();
-      return res.json({ 
-        success: true, 
-        applications: applications,
-        total: applications.length
-      });
+      const applications = await getAllApplications();
+      res.json({ success: true, applications, total: applications.length });
     }
-
   } catch (error) {
-    console.error('Error in application API:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('❌ Error in application API:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 }
+
+
 
 
 
