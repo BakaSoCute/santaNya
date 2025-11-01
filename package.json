@@ -4,8 +4,10 @@
   "type": "module",
   "dependencies": {
     "@vercel/node": "^2.0.0",
-     "@vercel/kv": "^1.0.0",
+    "@vercel/kv": "^1.0.0",
+    "@upstash/redis": "^1.22.0",
     "axios": "^1.6.0"
   }
 }
+
 
