@@ -23,21 +23,20 @@ export default async function handler(req, res) {
     // console.log(`🔄 Processing ${action} for application ${applicationId}`);
 
     // Диагностика перед обновлением
-    await debugRedis();
+       await debugRedis();
     
     const { callback_query } = req.body;
     const [action, applicationId] = data.split('_');
 
-    // Обновляем статус в общем хранилище
+    // Обновляем статус в Redis
     const updated = await updateApplicationStatus(
       applicationId, 
       action === 'approve' ? 'approved' : 'rejected',
       from.username || from.first_name
     );
-
-
-    if (!updated) {
-      console.log(`❌ Failed to update application ${applicationId}`);
+    
+    if (updated) {
+      console.log(`✅ Successfully updated application ${applicationId} in Redis`);
     }
 
     // Отвечаем на callback
