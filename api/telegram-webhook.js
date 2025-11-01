@@ -1,48 +1,41 @@
-import { updateApplicationStatus } from './lib/applications.js';
-
+// Простая версия для диагностики
 export default async function handler(req, res) {
   console.log('🤖 Telegram webhook called');
   
   try {
+    // Логируем весь запрос для диагностики
+    console.log('Webhook body:', JSON.stringify(req.body, null, 2));
+    
     const { callback_query } = req.body;
-    console.log('Webhook data:', JSON.stringify(req.body, null, 2));
 
     if (!callback_query) {
-      console.log('No callback_query in request');
-      return res.status(400).json({ error: 'No callback data' });
+      console.log('No callback_query found');
+      return res.status(200).json({ ok: true }); // Всегда возвращаем 200 для Telegram
     }
 
     const { data, message, from } = callback_query;
+    console.log(`Processing: ${data} from user: ${from.username || from.first_name}`);
+
+    // Простая обработка без сложной логики
     const [action, applicationId] = data.split('_');
+    
+    // Сначала сразу отвечаем Telegram, чтобы не было таймаута
+    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        callback_query_id: callback_query.id,
+        text: `Заявка ${action === 'approve' ? 'одобрена' : 'отклонена'}!`
+      }),
+    });
 
-    console.log(`🔄 Processing ${action} for application ${applicationId}`);
-
-    const application = updateApplicationStatus(
-      applicationId, 
-      action === 'approve' ? 'approved' : 'rejected',
-      action === 'approve' ? (from.username || from.first_name) : null,
-      action === 'reject' ? (from.username || from.first_name) : null
-    );
-
-    if (!application) {
-      console.error('Application not found:', applicationId);
-      return res.status(404).json({ error: 'Application not found' });
-    }
-
-    // Обновляем сообщение в Telegram
-    const statusEmoji = application.status === 'approved' ? '✅' : '❌';
-    const statusText = application.status === 'approved' ? 'Одобрена' : 'Отклонена';
-
+    // Затем обновляем сообщение
+    const statusText = action === 'approve' ? '✅ Одобрена' : '❌ Отклонена';
     const updatedMessage = `🎁 *ЗАЯВКА #${applicationId}*\n\n` +
-      `👤 *Twitch ник:* ${application.twitchName}\n` +
-      `📞 *Способ связи:* ${application.contactMethod === 'telegram' ? 'Telegram' : 'Discord'}\n` +
-      `💬 *Контакт:* ${application.contactInfo}\n` +
-      `⏰ *Время подачи:* ${new Date(application.createdAt).toLocaleString('ru-RU')}\n` +
-      `📊 *Статус:* ${statusEmoji} ${statusText}\n` +
-      (application.approvedBy ? `✅ *Одобрил:* ${application.approvedBy}\n` : '') +
-      (application.rejectedBy ? `❌ *Отклонил:* ${application.rejectedBy}\n` : '');
+      `📊 *Статус:* ${statusText}\n` +
+      `👤 *Обработал:* ${from.username || from.first_name}\n` +
+      `⏰ *Время:* ${new Date().toLocaleString('ru-RU')}`;
 
-    // Обновляем сообщение в Telegram
     await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -55,21 +48,15 @@ export default async function handler(req, res) {
       }),
     });
 
-    // Отправляем ответ на callback
-    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        callback_query_id: callback_query.id,
-        text: `Заявка ${statusText.toLowerCase()}!`
-      }),
-    });
-
-    console.log(`✅ Application ${applicationId} ${application.status}`);
-    res.json({ success: true });
+    console.log(`✅ Successfully processed ${action} for application ${applicationId}`);
+    
+    // Всегда возвращаем 200 для Telegram
+    res.status(200).json({ ok: true });
 
   } catch (error) {
-    console.error('💥 Telegram webhook error:', error);
-    res.status(500).json({ error: 'Failed to process webhook' });
+    console.error('💥 Webhook error:', error);
+    
+    // Всегда возвращаем 200 даже при ошибках, иначе Telegram будет считать webhook нерабочим
+    res.status(200).json({ ok: true, error: error.message });
   }
 }
