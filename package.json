@@ -7,9 +7,11 @@
     "@vercel/kv": "^1.0.0",
     "redis": "^4.6.0",
     "axios": "^1.6.0",
-    "formidable": "^3.5.1"
+    "formidable": "^3.5.1",
+    "busboy": "^1.6.0"
   }
 }
+
 
 
 
