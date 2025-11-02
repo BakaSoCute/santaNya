@@ -6,9 +6,11 @@
     "@vercel/node": "^2.0.0",
     "@vercel/kv": "^1.0.0",
     "redis": "^4.6.0",
-    "axios": "^1.6.0"
+    "axios": "^1.6.0",
+    "formidable": "^3.5.1"
   }
 }
+
 
 
 
