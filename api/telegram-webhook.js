@@ -4,37 +4,23 @@ export default async function handler(req, res) {
   console.log('🤖 Telegram webhook called - SIMPLIFIED VERSION');
   
   try {
-    // Отправляем ответ сразу, но продолжаем обработку
+    // Отправляем ответ сразу
     res.status(200).json({ ok: true, received: true });
     
-    // Запускаем асинхронную обработку с таймаутом
-    await processWebhookWithTimeout(req.body);
+    // Запускаем асинхронную обработку
+    processWebhookAsync(req.body).catch(error => {
+      console.error('💥 Async processing failed:', error);
+    });
     
   } catch (error) {
     console.error('💥 Webhook setup error:', error);
-    // Уже отправили ответ 200, так что просто логируем ошибку
-  }
-}
-
-// Обработка с таймаутом
-async function processWebhookWithTimeout(body) {
-  // Устанавливаем таймаут 8 секунд (Telegram ожидает ответ за 10 сек)
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('Processing timeout')), 8000);
-  });
-
-  try {
-    await Promise.race([
-      processWebhookAsync(body),
-      timeoutPromise
-    ]);
-  } catch (error) {
-    console.error('💥 Webhook processing timeout/error:', error.message);
   }
 }
 
 // Асинхронная обработка webhook
 async function processWebhookAsync(body) {
+  let callbackAnswered = false;
+  
   try {
     console.log('📦 Webhook body:', JSON.stringify(body, null, 2));
     
@@ -62,15 +48,21 @@ async function processWebhookAsync(body) {
 
     console.log(`🔄 Action: ${action}, Application ID: ${applicationId}`);
 
-    // Сначала отвечаем на callback query чтобы пользователь видел реакцию
-    await fetchWithTimeout(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        callback_query_id: callback_query.id,
-        text: `⏳ Обрабатываю заявку...`
-      }),
-    }, 3000);
+    // Сначала быстро отвечаем на callback query
+    try {
+      await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          callback_query_id: callback_query.id,
+          text: `⏳ Обрабатываю заявку...`
+        }),
+      });
+      callbackAnswered = true;
+      console.log('✅ Callback answered');
+    } catch (error) {
+      console.error('❌ Failed to answer callback:', error);
+    }
 
     // Обновляем статус в Redis
     const status = action === 'approve' ? 'approved' : 'rejected';
@@ -83,16 +75,18 @@ async function processWebhookAsync(body) {
     if (!updated) {
       console.log(`❌ Application ${applicationId} not found in Redis`);
       
-      // Уведомляем пользователя в Telegram
-      await fetchWithTimeout(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          callback_query_id: callback_query.id,
-          text: `❌ Заявка #${applicationId} не найдена`,
-          show_alert: true
-        }),
-      }, 3000);
+      if (callbackAnswered) {
+        // Обновляем ответ
+        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            callback_query_id: callback_query.id,
+            text: `❌ Заявка #${applicationId} не найдена`,
+            show_alert: true
+          }),
+        });
+      }
       return;
     }
 
@@ -110,7 +104,7 @@ async function processWebhookAsync(body) {
       `📊 *Статус:* ${statusEmoji} ${statusText}\n` +
       `👤 *Обработал:* ${processedBy}`;
 
-    await fetchWithTimeout(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
+    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -120,7 +114,7 @@ async function processWebhookAsync(body) {
         parse_mode: 'Markdown',
         reply_markup: { inline_keyboard: [] }
       }),
-    }, 5000);
+    });
 
     console.log(`✅ Successfully processed ${action} for application ${applicationId}`);
 
@@ -128,9 +122,9 @@ async function processWebhookAsync(body) {
     console.error('💥 Async webhook processing error:', error);
     
     // В случае ошибки пытаемся хотя бы ответить на callback
-    if (body.callback_query) {
+    if (body.callback_query && !callbackAnswered) {
       try {
-        await fetchWithTimeout(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -138,29 +132,11 @@ async function processWebhookAsync(body) {
             text: '❌ Ошибка при обработке',
             show_alert: true
           }),
-        }, 3000);
+        });
       } catch (fetchError) {
         console.error('💥 Even callback answer failed:', fetchError);
       }
     }
-  }
-}
-
-// Функция fetch с таймаутом
-async function fetchWithTimeout(url, options, timeout = 5000) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
   }
 }
 
