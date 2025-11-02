@@ -29,22 +29,38 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: false, error: 'Telegram configuration missing' });
     }
 
-    // Парсим FormData с помощью busboy
     const busboy = Busboy({ headers: req.headers });
     
     let text = '';
+    let name = '';
+    let typeContact = '';
+    let contact = '';
     let imageBuffer = null;
     let imageInfo = null;
 
     return new Promise((resolve) => {
       busboy.on('field', (fieldname, val) => {
-        if (fieldname === 'text') {
-          text = val;
+        console.log('📝 Field:', fieldname, val);
+        
+        switch (fieldname) {
+          case 'text':
+            text = val;
+            break;
+          case 'name':
+            name = val;
+            break;
+          case 'type contact':
+            typeContact = val;
+            break;
+          case 'contact':
+            contact = val;
+            break;
         }
       });
 
       busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
         if (fieldname === 'image') {
+          console.log('📸 Processing image:', filename);
           const chunks = [];
           imageInfo = { filename, mimetype };
           
@@ -54,80 +70,110 @@ export default async function handler(req, res) {
 
           file.on('end', () => {
             imageBuffer = Buffer.concat(chunks);
+            console.log('✅ Image loaded:', imageBuffer.length, 'bytes');
           });
         } else {
-          file.resume(); // Игнорируем другие файлы
+          file.resume();
         }
       });
 
       busboy.on('finish', async () => {
         try {
-          console.log('📤 Processing:', { 
-            text, 
+          console.log('📤 All data received:', {
+            text,
+            name,
+            typeContact,
+            contact,
             hasImage: !!imageBuffer,
-            imageSize: imageBuffer?.length 
+            imageSize: imageBuffer?.length
           });
+
+          // Формируем текст сообщения для Telegram
+          let telegramMessage = '';
+          
+          if (name) {
+            telegramMessage += `👤 <b>Имя:</b> ${name}\n`;
+          }
+          
+          if (typeContact) {
+            telegramMessage += `📞 <b>Тип связи:</b> ${typeContact}\n`;
+          }
+          
+          if (contact) {
+            telegramMessage += `💬 <b>Контакт:</b> ${contact}\n`;
+          }
+          
+          if (text) {
+            telegramMessage += `\n📝 <b>Сообщение:</b>\n${text}`;
+          }
 
           let result;
 
           if (imageBuffer) {
-            // Отправка изображения в Telegram
+            // Отправка изображения с текстом
             const formData = new FormData();
+            formData.append('chat_id', chatId);
             
             // Создаем Blob из buffer
             const blob = new Blob([imageBuffer], { type: imageInfo.mimetype });
-            formData.append('chat_id', chatId);
             formData.append('photo', blob, imageInfo.filename);
             
-            if (text) {
-              formData.append('caption', text);
+            if (telegramMessage) {
+              formData.append('caption', telegramMessage);
+              formData.append('parse_mode', 'HTML');
             }
 
+            console.log('📨 Sending image to Telegram...');
             const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
               method: 'POST',
               body: formData
             });
 
+            const telegramResult = await telegramResponse.json();
+            console.log('📬 Telegram response:', telegramResult);
+
             if (telegramResponse.ok) {
               result = { 
                 success: true, 
-                message: '✅ Изображение и текст отправлены в Telegram!' 
+                message: '✅ Данные и изображение отправлены в Telegram!' 
               };
             } else {
-              const errorData = await telegramResponse.json();
               result = { 
                 success: false, 
-                error: errorData.description || 'Ошибка отправки изображения' 
+                error: telegramResult.description || 'Ошибка отправки изображения' 
               };
             }
-          } else if (text) {
+          } else if (telegramMessage) {
             // Отправка только текста
+            console.log('📨 Sending text to Telegram...');
             const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 chat_id: chatId,
-                text: text,
+                text: telegramMessage,
                 parse_mode: 'HTML'
               })
             });
 
+            const telegramResult = await telegramResponse.json();
+            console.log('📬 Telegram response:', telegramResult);
+
             if (telegramResponse.ok) {
               result = { 
                 success: true, 
-                message: '✅ Текст отправлен в Telegram!' 
+                message: '✅ Данные отправлены в Telegram!' 
               };
             } else {
-              const errorData = await telegramResponse.json();
               result = { 
                 success: false, 
-                error: errorData.description || 'Ошибка отправки сообщения' 
+                error: telegramResult.description || 'Ошибка отправки сообщения' 
               };
             }
           } else {
             result = { 
               success: false, 
-              error: 'Необходимо указать текст или изображение' 
+              error: 'Необходимо указать данные для отправки' 
             };
           }
 
@@ -153,7 +199,6 @@ export default async function handler(req, res) {
         resolve();
       });
 
-      // Передаем запрос в busboy
       req.pipe(busboy);
     });
 
