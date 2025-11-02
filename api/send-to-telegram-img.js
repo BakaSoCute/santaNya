@@ -3,7 +3,7 @@ import fs from 'fs';
 
 export const config = {
   api: {
-    bodyParser: false, // Отключаем встроенный парсер для FormData
+    bodyParser: false,
   },
 };
 
@@ -13,9 +13,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Парсим FormData
     const form = formidable({
-      maxFileSize: 10 * 1024 * 1024, // 10MB
+      maxFileSize: 10 * 1024 * 1024,
       keepExtensions: true,
     });
 
@@ -29,23 +28,24 @@ export default async function handler(req, res) {
     const text = fields.text ? fields.text[0] : '';
     const image = files.image ? files.image[0] : null;
 
-    // Ваш Telegram Bot Token и Chat ID
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
 
     if (!botToken || !chatId) {
-      return res.status(500).json({ error: 'Telegram configuration missing' });
+      // Важно: всегда возвращаем JSON
+      return res.status(200).json({ 
+        success: false, 
+        error: 'Telegram configuration missing' 
+      });
     }
 
-    let messageSent = false;
+    let result;
 
-    // Если есть изображение
     if (image) {
-      // Создаем FormData для Telegram API
+      // Отправка изображения
       const telegramFormData = new FormData();
       telegramFormData.append('chat_id', chatId);
       
-      // Добавляем файл как blob
       const fileBuffer = fs.readFileSync(image.filepath);
       const blob = new Blob([fileBuffer], { type: image.mimetype });
       telegramFormData.append('photo', blob, image.originalFilename);
@@ -60,17 +60,21 @@ export default async function handler(req, res) {
       });
 
       // Удаляем временный файл
-      fs.unlinkSync(image.filepath);
+      if (fs.existsSync(image.filepath)) {
+        fs.unlinkSync(image.filepath);
+      }
 
       if (response.ok) {
-        messageSent = true;
+        result = { success: true, message: 'Изображение отправлено в Telegram!' };
       } else {
-        const errorText = await response.text();
-        console.error('Telegram API error:', errorText);
+        const errorData = await response.json();
+        result = { 
+          success: false, 
+          error: errorData.description || 'Ошибка отправки изображения' 
+        };
       }
-    } 
-    // Если только текст
-    else if (text) {
+    } else if (text) {
+      // Отправка только текста
       const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: 'POST',
         headers: {
@@ -84,23 +88,31 @@ export default async function handler(req, res) {
       });
 
       if (response.ok) {
-        messageSent = true;
+        result = { success: true, message: 'Сообщение отправлено в Telegram!' };
       } else {
-        const errorText = await response.text();
-        console.error('Telegram API error:', errorText);
+        const errorData = await response.json();
+        result = { 
+          success: false, 
+          error: errorData.description || 'Ошибка отправки сообщения' 
+        };
       }
     } else {
-      return res.status(400).json({ error: 'No text or image provided' });
+      result = { 
+        success: false, 
+        error: 'Необходимо указать текст или изображение' 
+      };
     }
 
-    if (messageSent) {
-      res.status(200).json({ success: true, message: 'Message sent to Telegram' });
-    } else {
-      res.status(500).json({ error: 'Failed to send message to Telegram' });
-    }
+    // Всегда возвращаем JSON с правильной структурой
+    res.status(200).json(result);
 
   } catch (error) {
     console.error('Error sending to Telegram:', error);
-    res.status(500).json({ error: 'Internal server error: ' + error.message });
+    
+    // Всегда возвращаем JSON даже при ошибках
+    res.status(200).json({ 
+      success: false, 
+      error: 'Внутренняя ошибка сервера: ' + error.message 
+    });
   }
 }
