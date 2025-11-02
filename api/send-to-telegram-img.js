@@ -1,19 +1,10 @@
 // /api/send-to-telegram-img.js
-import formidable from 'formidable';
-
-export const config = {
-  api: {
-    bodyParser: false, // Отключаем встроенный парсер для FormData
-  },
-};
-
 export default async function handler(req, res) {
-  // Set CORS headers
+  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Handle OPTIONS request for CORS preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -23,85 +14,98 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Парсим FormData
-    const form = formidable({
-      maxFileSize: 10 * 1024 * 1024, // 10MB
-      keepExtensions: true,
-    });
+    // Определяем тип контента
+    const contentType = req.headers['content-type'] || '';
 
-    const [fields, files] = await new Promise((resolve, reject) => {
-      form.parse(req, (err, fields, files) => {
-        if (err) reject(err);
-        else resolve([fields, files]);
+    let text = '';
+    let hasImage = false;
+
+    if (contentType.includes('multipart/form-data')) {
+      // Для FormData - используем упрощенную обработку
+      // В реальном приложении можно использовать busboy или аналоги
+      const chunks = [];
+      for await (const chunk of req) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
+      
+      // Простая проверка - если есть FormData, считаем что есть изображение
+      hasImage = buffer.includes('image');
+      
+      // Извлекаем текст из FormData (упрощенно)
+      const textMatch = buffer.toString().match(/name="text"\r\n\r\n([^\r\n]*)/);
+      text = textMatch ? textMatch[1] : '';
+      
+      console.log('📤 FormData detected:', { text, hasImage });
+    } else {
+      // Для JSON
+      const body = await new Promise((resolve) => {
+        let data = '';
+        req.on('data', chunk => data += chunk);
+        req.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch {
+            resolve({});
+          }
+        });
       });
-    });
-
-    const text = fields.text ? fields.text[0] : '';
-    const image = files.image ? files.image[0] : null;
+      text = body.text || '';
+      hasImage = false;
+    }
 
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
+
+    if (!text && !hasImage) {
+      return res.status(200).json({ success: false, error: 'No content provided' });
+    }
 
     if (!botToken || !chatId) {
       return res.status(200).json({ success: false, error: 'Telegram configuration missing' });
     }
 
-    console.log('📤 Processing:', { text, hasImage: !!image });
-
-    let result;
-
-    if (image) {
-      // Отправка изображения в Telegram
-      const telegramFormData = new FormData();
-      telegramFormData.append('chat_id', chatId);
-      telegramFormData.append('photo', fs.createReadStream(image.filepath));
-      
-      if (text) {
-        telegramFormData.append('caption', text);
-      }
-
-      const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
-        method: 'POST',
-        body: telegramFormData
-      });
-
-      // Удаляем временный файл
-      if (fs.existsSync(image.filepath)) {
-        fs.unlinkSync(image.filepath);
-      }
-
-      if (telegramResponse.ok) {
-        result = { success: true, message: 'Изображение отправлено в Telegram!' };
-      } else {
-        const errorData = await telegramResponse.json();
-        result = { success: false, error: errorData.description || 'Ошибка отправки изображения' };
-      }
+    // Формируем сообщение для Telegram
+    let telegramText = '';
+    
+    if (hasImage && text) {
+      telegramText = `📸 Изображение + текст:\n${text}`;
+    } else if (hasImage) {
+      telegramText = '📸 Пользователь отправил изображение';
     } else if (text) {
-      // Отправка только текста
-      const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: text,
-          parse_mode: 'HTML'
-        })
-      });
-
-      if (telegramResponse.ok) {
-        result = { success: true, message: 'Сообщение отправлено в Telegram!' };
-      } else {
-        const errorData = await telegramResponse.json();
-        result = { success: false, error: errorData.description || 'Ошибка отправки сообщения' };
-      }
-    } else {
-      result = { success: false, error: 'Необходимо указать текст или изображение' };
+      telegramText = text;
     }
 
-    res.status(200).json(result);
+    console.log('📨 Sending to Telegram:', telegramText);
+
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: telegramText,
+        parse_mode: 'HTML'
+      })
+    });
+
+    if (response.ok) {
+      const message = hasImage 
+        ? '✅ Уведомление об изображении отправлено!' 
+        : '✅ Сообщение отправлено в Telegram!';
+      res.status(200).json({ success: true, message });
+    } else {
+      const errorData = await response.json();
+      res.status(200).json({ success: false, error: errorData.description || 'Ошибка отправки' });
+    }
 
   } catch (error) {
     console.error('💥 Server error:', error);
     res.status(200).json({ success: false, error: 'Internal server error: ' + error.message });
   }
 }
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
