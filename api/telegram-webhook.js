@@ -13,6 +13,25 @@ function escapeMarkdownV2(text) {
   
   return escapedText;
 }
+async function handleChatIdCommand(message) {
+  const chatId = message.chat.id;
+  const userName = message.chat.username || message.chat.first_name;
+  
+  const responseText = `
+📋 Информация о чате:
+
+🆔 Chat ID: \`${chatId}\`
+👤 Имя: ${userName}
+💬 Тип чата: ${message.chat.type}
+📅 Дата регистрации: ${new Date().toLocaleDateString('ru-RU')}
+
+💡 Сохраните этот Chat ID для настройки бота
+  `;
+
+  await sendTelegramMessage(chatId, responseText);
+  
+  console.log('✅ Chat ID получен:', { chatId, userName });
+}
 
 // Функция для создания безопасного сообщения
 function createSafeMessage(applicationId, updated, status, statusEmoji, statusText, processedBy) {
@@ -40,6 +59,9 @@ export default async function handler(req, res) {
   
   try {
     const { callback_query } = req.body;
+     if (text.startsWith('/start')) {
+       await handleChatIdCommand(message)
+     }
 
     if (!callback_query) {
       console.log('❌ No callback_query in request');
