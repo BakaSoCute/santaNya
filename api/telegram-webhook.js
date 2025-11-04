@@ -13,6 +13,21 @@ function escapeMarkdownV2(text) {
   
   return escapedText;
 }
+
+// Функция для отправки сообщений в Telegram
+async function sendTelegramMessage(chatId, text, parse_mode = 'Markdown') {
+  const response = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: text,
+      parse_mode: parse_mode
+    }),
+  });
+  return await response.json();
+}
+
 async function handleChatIdCommand(message) {
   const chatId = message.chat.id;
   const userName = message.chat.username || message.chat.first_name;
@@ -58,161 +73,177 @@ export default async function handler(req, res) {
   console.log('🤖 Telegram webhook called');
   
   try {
-    const { callback_query } = req.body;
+    const { message, callback_query } = req.body;
 
-     if (message && message.text) {
-      const { text, chat, from } = message;
-       if (text.startsWith('/start')) {
-         await handleChatIdCommand(message)
-       }
-       return res.status(200).json({ ok: true });
-     }
+    // Обработка обычных сообщений (команд)
+    if (message && message.text) {
+      const { text } = message;
+      console.log(`💬 Received message: "${text}" from ${message.from.username || message.from.first_name}`);
 
-    
-    if (!callback_query) {
-      console.log('❌ No callback_query in request');
+      if (text.startsWith('/start') || text.startsWith('/chatid')) {
+        await handleChatIdCommand(message);
+      } else {
+        // Ответ на любое другое сообщение
+        await sendTelegramMessage(message.chat.id, `
+🤖 Я бот-модератор заявок.
+
+Используйте команды:
+/start - начать работу
+/chatid - получить Chat ID
+
+Или работайте с заявками через кнопки.
+        `);
+      }
+
       return res.status(200).json({ ok: true });
     }
 
-    const { data, message, from, id: callback_id } = callback_query;
-    console.log(`🔍 Processing callback: ${data} from ${from.username || from.first_name}`);
+    // Обработка callback query (кнопки)
+    if (callback_query) {
+      const { data, message: callbackMessage, from, id: callback_id } = callback_query; // Переименовали переменную
+      console.log(`🔍 Processing callback: ${data} from ${from.username || from.first_name}`);
 
-    if (!data) {
-      console.log('❌ No data in callback');
-      return res.status(200).json({ ok: true });
-    }
+      if (!data) {
+        console.log('❌ No data in callback');
+        return res.status(200).json({ ok: true });
+      }
 
-    const [action, applicationId] = data.split('_');
-    
-    if (!action || !applicationId) {
-      console.log('❌ Invalid data format:', data);
-      return res.status(200).json({ ok: true });
-    }
-
-    console.log(`🔄 Action: ${action}, Application ID: ${applicationId}`);
-
-    // Сразу отвечаем на callback query чтобы Telegram знал что мы получили запрос
-    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        callback_query_id: callback_id,
-        text: `⏳ Обрабатываю...`
-      }),
-    });
-
-    // Обновляем статус в Redis
-    const status = action === 'approve' ? 'approved' : 'rejected';
-    const processedBy = from.username || from.first_name;
-    
-    console.log(`📝 Updating application ${applicationId} to ${status}`);
-    
-    const updated = await updateApplicationStatus(applicationId, status, processedBy);
-    
-    if (!updated) {
-      console.log(`❌ Application ${applicationId} not found in Redis`);
+      const [action, applicationId] = data.split('_');
       
-      // Уведомляем пользователя об ошибке
+      if (!action || !applicationId) {
+        console.log('❌ Invalid data format:', data);
+        return res.status(200).json({ ok: true });
+      }
+
+      console.log(`🔄 Action: ${action}, Application ID: ${applicationId}`);
+
+      // Сразу отвечаем на callback query чтобы Telegram знал что мы получили запрос
       await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           callback_query_id: callback_id,
-          text: `❌ Заявка #${applicationId} не найдена`,
-          show_alert: true
+          text: `⏳ Обрабатываю...`
         }),
       });
+
+      // Обновляем статус в Redis
+      const status = action === 'approve' ? 'approved' : 'rejected';
+      const processedBy = from.username || from.first_name;
       
-      return res.status(200).json({ ok: true });
-    }
-
-    console.log(`✅ Application ${applicationId} updated to ${status}`);
-
-    // Обновляем сообщение в Telegram
-    const statusEmoji = status === 'approved' ? '✅' : '❌';
-    const statusText = status === 'approved' ? 'Одобрена' : 'Отклонена';
-
-    // Создаем безопасное сообщение
-    const updatedMessage = createSafeMessage(applicationId, updated, status, statusEmoji, statusText, processedBy);
-
-    console.log('📝 Safe message created, editing...');
-
-    // Обновляем сообщение с MarkdownV2
-    const editResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: message.chat.id,
-        message_id: message.message_id,
-        text: updatedMessage,
-        parse_mode: 'MarkdownV2', // Используем MarkdownV2 вместо Markdown
-        reply_markup: { inline_keyboard: [] } // Убираем кнопки
-      }),
-    });
-
-    const editResult = await editResponse.json();
-    
-    if (!editResult.ok) {
-      console.error('❌ Failed to edit message:', editResult);
+      console.log(`📝 Updating application ${applicationId} to ${status}`);
       
-      // Если ошибка форматирования, пробуем отправить без форматирования
-      if (editResult.description?.includes('entities') || editResult.description?.includes('parse')) {
-        console.log('🔄 Trying fallback without formatting...');
+      const updated = await updateApplicationStatus(applicationId, status, processedBy);
+      
+      if (!updated) {
+        console.log(`❌ Application ${applicationId} not found in Redis`);
         
-        const fallbackMessage = `🎁 ЗАЯВКА #${applicationId}\n\n` +
-          `👤 Twitch ник: ${updated.twitchName || 'Не указан'}\n` +
-          `📞 Способ связи: ${updated.contactMethod === 'telegram' ? 'Telegram' : 'Discord'}\n` +
-          `💬 Контакт: ${updated.contactInfo || 'Не указан'}\n` +
-          `⏰ Время подачи: ${new Date(updated.createdAt).toLocaleString('ru-RU')}\n` +
-          `📊 Статус: ${statusEmoji} ${statusText}\n` +
-          `👤 Обработал: ${processedBy}`;
-
-        const fallbackResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
+        // Уведомляем пользователя об ошибке
+        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            chat_id: message.chat.id,
-            message_id: message.message_id,
-            text: fallbackMessage,
-            // Без parse_mode - обычный текст
-            reply_markup: { inline_keyboard: [] }
+            callback_query_id: callback_id,
+            text: `❌ Заявка #${applicationId} не найдена`,
+            show_alert: true
           }),
         });
-
-        const fallbackResult = await fallbackResponse.json();
         
-        if (fallbackResult.ok) {
-          console.log('✅ Message updated without formatting');
-        } else {
-          console.error('❌ Fallback also failed:', fallbackResult);
-        }
+        return res.status(200).json({ ok: true });
       }
-      
-      // Показываем alert пользователю
-      await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+
+      console.log(`✅ Application ${applicationId} updated to ${status}`);
+
+      // Обновляем сообщение в Telegram
+      const statusEmoji = status === 'approved' ? '✅' : '❌';
+      const statusText = status === 'approved' ? 'Одобрена' : 'Отклонена';
+
+      // Создаем безопасное сообщение
+      const updatedMessage = createSafeMessage(applicationId, updated, status, statusEmoji, statusText, processedBy);
+
+      console.log('📝 Safe message created, editing...');
+
+      // Обновляем сообщение с MarkdownV2
+      const editResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          callback_query_id: callback_id,
-          text: `✅ Заявка ${action === 'approve' ? 'одобрена' : 'отклонена'}!`,
-          show_alert: true
+          chat_id: callbackMessage.chat.id, // Используем переименованную переменную
+          message_id: callbackMessage.message_id, // Используем переименованную переменную
+          text: updatedMessage,
+          parse_mode: 'MarkdownV2',
+          reply_markup: { inline_keyboard: [] } // Убираем кнопки
         }),
       });
-    } else {
-      console.log('✅ Message updated successfully');
+
+      const editResult = await editResponse.json();
       
-      // Подтверждаем успешное выполнение
-      await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          callback_query_id: callback_id,
-          text: `✅ Заявка ${action === 'approve' ? 'одобрена' : 'отклонена'}!`
-        }),
-      });
+      if (!editResult.ok) {
+        console.error('❌ Failed to edit message:', editResult);
+        
+        // Если ошибка форматирования, пробуем отправить без форматирования
+        if (editResult.description?.includes('entities') || editResult.description?.includes('parse')) {
+          console.log('🔄 Trying fallback without formatting...');
+          
+          const fallbackMessage = `🎁 ЗАЯВКА #${applicationId}\n\n` +
+            `👤 Twitch ник: ${updated.twitchName || 'Не указан'}\n` +
+            `📞 Способ связи: ${updated.contactMethod === 'telegram' ? 'Telegram' : 'Discord'}\n` +
+            `💬 Контакт: ${updated.contactInfo || 'Не указан'}\n` +
+            `⏰ Время подачи: ${new Date(updated.createdAt).toLocaleString('ru-RU')}\n` +
+            `📊 Статус: ${statusEmoji} ${statusText}\n` +
+            `👤 Обработал: ${processedBy}`;
+
+          const fallbackResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: callbackMessage.chat.id, // Используем переименованную переменную
+              message_id: callbackMessage.message_id, // Используем переименованную переменную
+              text: fallbackMessage,
+              // Без parse_mode - обычный текст
+              reply_markup: { inline_keyboard: [] }
+            }),
+          });
+
+          const fallbackResult = await fallbackResponse.json();
+          
+          if (fallbackResult.ok) {
+            console.log('✅ Message updated without formatting');
+          } else {
+            console.error('❌ Fallback also failed:', fallbackResult);
+          }
+        }
+        
+        // Показываем alert пользователю
+        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            callback_query_id: callback_id,
+            text: `✅ Заявка ${action === 'approve' ? 'одобрена' : 'отклонена'}!`,
+            show_alert: true
+          }),
+        });
+      } else {
+        console.log('✅ Message updated successfully');
+        
+        // Подтверждаем успешное выполнение
+        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            callback_query_id: callback_id,
+            text: `✅ Заявка ${action === 'approve' ? 'одобрена' : 'отклонена'}!`
+          }),
+        });
+      }
+
+      console.log(`✅ Successfully processed ${action} for application ${applicationId}`);
+      return res.status(200).json({ ok: true });
     }
 
-    console.log(`✅ Successfully processed ${action} for application ${applicationId}`);
+    // Если пришел неизвестный тип запроса
+    console.log('❓ Unknown request type:', Object.keys(req.body));
     return res.status(200).json({ ok: true });
 
   } catch (error) {
