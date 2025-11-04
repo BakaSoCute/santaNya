@@ -1,5 +1,40 @@
 import { updateApplicationStatus } from '../lib/vercel-redis-storage.js';
 
+// Функция для экранирования MarkdownV2 символов
+function escapeMarkdownV2(text) {
+  if (!text) return '';
+  
+  const specialChars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
+  let escapedText = String(text);
+  
+  specialChars.forEach(char => {
+    escapedText = escapedText.split(char).join(`\\${char}`);
+  });
+  
+  return escapedText;
+}
+
+// Функция для создания безопасного сообщения
+function createSafeMessage(applicationId, updated, status, statusEmoji, statusText, processedBy) {
+  const escapedTwitchName = escapeMarkdownV2(updated.twitchName);
+  const escapedContactInfo = escapeMarkdownV2(updated.contactInfo);
+  const escapedApplicationId = escapeMarkdownV2(applicationId.toString());
+  const escapedProcessedBy = escapeMarkdownV2(processedBy);
+  
+  const formattedTime = new Date(updated.createdAt).toLocaleString('ru-RU');
+  const escapedTime = escapeMarkdownV2(formattedTime);
+
+  const message = `🎁 *ЗАЯВКА \\#${escapedApplicationId}*\n\n` +
+    `👤 *Twitch ник:* ${escapedTwitchName || 'Не указан'}\n` +
+    `📞 *Способ связи:* ${updated.contactMethod === 'telegram' ? 'Telegram' : 'Discord'}\n` +
+    `💬 *Контакт:* ${escapedContactInfo || 'Не указан'}\n` +
+    `⏰ *Время подачи:* ${escapedTime}\n` +
+    `📊 *Статус:* ${statusEmoji} ${statusText}\n` +
+    `👤 *Обработал:* ${escapedProcessedBy}`;
+
+  return message;
+}
+
 export default async function handler(req, res) {
   console.log('🤖 Telegram webhook called');
   
@@ -69,15 +104,12 @@ export default async function handler(req, res) {
     const statusEmoji = status === 'approved' ? '✅' : '❌';
     const statusText = status === 'approved' ? 'Одобрена' : 'Отклонена';
 
-    const updatedMessage = `🎁 *ЗАЯВКА #${applicationId}*\n\n` +
-      `👤 *Twitch ник:* ${updated.twitchName}\n` +
-      `📞 *Способ связи:* ${updated.contactMethod === 'telegram' ? 'Telegram' : 'Discord'}\n` +
-      `💬 *Контакт:* ${updated.contactInfo}\n` +
-      `⏰ *Время подачи:* ${new Date(updated.createdAt).toLocaleString('ru-RU')}\n` +
-      `📊 *Статус:* ${statusEmoji} ${statusText}\n` +
-      `👤 *Обработал:* ${processedBy}`;
+    // Создаем безопасное сообщение
+    const updatedMessage = createSafeMessage(applicationId, updated, status, statusEmoji, statusText, processedBy);
 
-    // Обновляем сообщение
+    console.log('📝 Safe message created, editing...');
+
+    // Обновляем сообщение с MarkdownV2
     const editResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -85,7 +117,7 @@ export default async function handler(req, res) {
         chat_id: message.chat.id,
         message_id: message.message_id,
         text: updatedMessage,
-        parse_mode: 'Markdown',
+        parse_mode: 'MarkdownV2', // Используем MarkdownV2 вместо Markdown
         reply_markup: { inline_keyboard: [] } // Убираем кнопки
       }),
     });
@@ -94,13 +126,47 @@ export default async function handler(req, res) {
     
     if (!editResult.ok) {
       console.error('❌ Failed to edit message:', editResult);
-      // Если не удалось обновить сообщение, хотя бы показываем alert
+      
+      // Если ошибка форматирования, пробуем отправить без форматирования
+      if (editResult.description?.includes('entities') || editResult.description?.includes('parse')) {
+        console.log('🔄 Trying fallback without formatting...');
+        
+        const fallbackMessage = `🎁 ЗАЯВКА #${applicationId}\n\n` +
+          `👤 Twitch ник: ${updated.twitchName || 'Не указан'}\n` +
+          `📞 Способ связи: ${updated.contactMethod === 'telegram' ? 'Telegram' : 'Discord'}\n` +
+          `💬 Контакт: ${updated.contactInfo || 'Не указан'}\n` +
+          `⏰ Время подачи: ${new Date(updated.createdAt).toLocaleString('ru-RU')}\n` +
+          `📊 Статус: ${statusEmoji} ${statusText}\n` +
+          `👤 Обработал: ${processedBy}`;
+
+        const fallbackResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: message.chat.id,
+            message_id: message.message_id,
+            text: fallbackMessage,
+            // Без parse_mode - обычный текст
+            reply_markup: { inline_keyboard: [] }
+          }),
+        });
+
+        const fallbackResult = await fallbackResponse.json();
+        
+        if (fallbackResult.ok) {
+          console.log('✅ Message updated without formatting');
+        } else {
+          console.error('❌ Fallback also failed:', fallbackResult);
+        }
+      }
+      
+      // Показываем alert пользователю
       await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           callback_query_id: callback_id,
-          text: `✅ Заявка ${action === 'approve' ? 'одобрена' : 'отклонена'}! (сообщение не обновлено)`,
+          text: `✅ Заявка ${action === 'approve' ? 'одобрена' : 'отклонена'}!`,
           show_alert: true
         }),
       });
