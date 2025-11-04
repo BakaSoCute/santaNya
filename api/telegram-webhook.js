@@ -59,10 +59,13 @@ export default async function handler(req, res) {
   
   try {
     const { callback_query } = req.body;
-     if (text.startsWith('/start')) {
-       await handleChatIdCommand(message)
-     }
 
+     if (message && message.text) {
+      const { text, chat, from } = message;
+       if (text.startsWith('/start')) {
+         await handleChatIdCommand(message)
+       }
+     }
     if (!callback_query) {
       console.log('❌ No callback_query in request');
       return res.status(200).json({ ok: true });
