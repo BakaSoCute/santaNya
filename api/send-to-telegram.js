@@ -18,7 +18,7 @@ function createSafeMessage(formData, applicationId) {
   const escapedFullName = escapeMarkdown(formData.fullName);
   const escapedContactInfo = escapeMarkdown(formData.contactInfo);
   
-  const message = `🎁 *НОВАЯ ЗАЯВКА #${applicationId}*\n\n` +
+  const message = `🎁 *НОВАЯ ЗАЯВКА \\#${applicationId}*\n\n` +
     `👤 *Twitch ник:* ${escapedFullName || 'Не указан'}\n` +
     `📞 *Способ связи:* ${formData.contactMethod === 'telegram' ? 'Telegram' : 'Discord'}\n` +
     `💬 *Контакт:* ${escapedContactInfo || 'Не указан'}\n` +
@@ -124,5 +124,6 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
 
