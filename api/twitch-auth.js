@@ -4,11 +4,11 @@ export default async function handler(req, res) {
   console.log('🔐 Twitch auth called');
   
 const allowedOrigins = [
-  'https://www.nyamuras-santa.ru/',
+  'https://www.nyamuras-santa.ru',
   'http://localhost:5173'
 ];
   
-  res.setHeader('Access-Control-Allow-Origin', 'https://www.nyamuras-santa.ru/');
+  res.setHeader('Access-Control-Allow-Origin', 'https://www.nyamuras-santa.ru');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -188,6 +188,7 @@ if (allowedOrigins.includes(origin)) {
 //   }
 
 // }
+
 
 
 
