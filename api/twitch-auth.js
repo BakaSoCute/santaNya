@@ -3,8 +3,22 @@ import axios from 'axios';
 export default async function handler(req, res) {
   console.log('🔐 Twitch auth called');
   
+const allowedOrigins = [
+  'https://www.nyamuras-santa.ru',
+  'http://localhost:5173'
+];
+
+const origin = req.headers.origin;
+if (allowedOrigins.includes(origin)) {
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+}
   // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', 'https://www.nyamuras-santa.ru');
+ const origin = req.headers.origin;
+if (allowedOrigins.includes(origin)) {
+  res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -177,4 +191,5 @@ export default async function handler(req, res) {
 //   }
 
 // }
+
 
