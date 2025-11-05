@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   console.log('📊 Application API called');
   
 const allowedOrigins = [
-  'https://www.nyamuras-santa.ru',
+  'https://www.nyamuras-santa.ru/',
   'http://localhost:5173'
 ];
   // CORS headers
@@ -68,5 +68,6 @@ if (allowedOrigins.includes(origin)) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
+
 
 
