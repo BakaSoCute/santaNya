@@ -3,8 +3,14 @@ import { getApplication, getAllApplications, debugRedis } from '../lib/vercel-re
 export default async function handler(req, res) {
   console.log('📊 Application API called');
   
+const allowedOrigins = [
+  'https://www.nyamuras-santa.ru',
+  'http://localhost:5173'
+];
   // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', 'https://www.nyamuras-santa.ru');
+const origin = req.headers.origin;
+if (allowedOrigins.includes(origin)) {
+  res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -62,4 +68,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
+
 
