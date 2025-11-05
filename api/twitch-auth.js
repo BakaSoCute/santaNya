@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   console.log('🔐 Twitch auth called');
   
 const allowedOrigins = [
-  'https://www.nyamuras-santa.ru',
+  'https://www.nyamuras-santa.ru/',
   'http://localhost:5173'
 ];
   
@@ -188,6 +188,7 @@ if (allowedOrigins.includes(origin)) {
 //   }
 
 // }
+
 
 
 
