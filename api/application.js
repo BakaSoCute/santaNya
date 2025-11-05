@@ -14,7 +14,7 @@ if (allowedOrigins.includes(origin)) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-
+}
   // Handle OPTIONS request for CORS preflight
   if (req.method === 'OPTIONS') {
     console.log('🔄 Handling CORS preflight request');
@@ -68,6 +68,7 @@ if (allowedOrigins.includes(origin)) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
+
 
 
 
