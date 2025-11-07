@@ -16,7 +16,7 @@ function escapeMarkdownV2(text) {
 
 // Функция для отправки сообщений в Telegram
 async function sendTelegramMessage(chatId, text, parse_mode = 'Markdown') {
-  const response = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+  const response = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN_REVIEW}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -118,7 +118,7 @@ export default async function handler(req, res) {
       console.log(`🔄 Action: ${action}, Application ID: ${applicationId}`);
 
       // Сразу отвечаем на callback query чтобы Telegram знал что мы получили запрос
-      await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+      await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN_REVIEW}/answerCallbackQuery`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -139,7 +139,7 @@ export default async function handler(req, res) {
         console.log(`❌ Application ${applicationId} not found in Redis`);
         
         // Уведомляем пользователя об ошибке
-        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN_REVIEW}/answerCallbackQuery`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -164,7 +164,7 @@ export default async function handler(req, res) {
       console.log('📝 Safe message created, editing...');
 
       // Обновляем сообщение с MarkdownV2
-      const editResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
+      const editResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN_REVIEW}/editMessageText`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -193,7 +193,7 @@ export default async function handler(req, res) {
             `📊 Статус: ${statusEmoji} ${statusText}\n` +
             `👤 Обработал: ${processedBy}`;
 
-          const fallbackResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
+          const fallbackResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN_REVIEW}/editMessageText`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -215,7 +215,7 @@ export default async function handler(req, res) {
         }
         
         // Показываем alert пользователю
-        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN_REVIEW}/answerCallbackQuery`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -228,7 +228,7 @@ export default async function handler(req, res) {
         console.log('✅ Message updated successfully');
         
         // Подтверждаем успешное выполнение
-        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN_REVIEW}/answerCallbackQuery`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -252,7 +252,7 @@ export default async function handler(req, res) {
     // В случае ошибки пытаемся ответить Telegram что что-то пошло не так
     try {
       if (req.body.callback_query) {
-        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN_REVIEW}/answerCallbackQuery`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
