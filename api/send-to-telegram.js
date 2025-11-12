@@ -13,7 +13,6 @@ function escapeMarkdown(text) {
   return escapedText;
 }
 
-// Функция для создания безопасного текста сообщения
 function createSafeMessage(formData, applicationId) {
   const escapedFullName = escapeMarkdown(formData.fullName);
   const escapedContactInfo = escapeMarkdown(formData.contactInfo);
@@ -43,7 +42,6 @@ if (allowedOrigins.includes(origin)) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
 }
-  // Handle OPTIONS request for CORS preflight
   if (req.method === 'OPTIONS') {
     console.log('🔄 Handling CORS preflight request');
     return res.status(200).end();
@@ -62,19 +60,12 @@ if (allowedOrigins.includes(origin)) {
 
     console.log('📨 Received Telegram request:', formData);
 
-    // Диагностика Redis
     await debugRedis();
     
-    // Создаем заявку в Redis
+
     const application = await createApplication(formData);
     const applicationId = application.id;
     const message = createSafeMessage(formData, applicationId);
-    // const message = `🎁 *НОВАЯ ЗАЯВКА #${applicationId}*\n\n` +
-    //   `👤 *Twitch ник:* ${formData.fullName || 'Не указан'}\n` +
-    //   `📞 *Способ связи:* ${formData.contactMethod === 'telegram' ? 'Telegram' : 'Discord'}\n` +
-    //   `💬 *Контакт:* ${formData.contactInfo || 'Не указан'}\n` +
-    //   `⏰ *Время:* ${new Date().toLocaleString('ru-RU')}\n` +
-    //   `📊 *Статус:* ⏳ Ожидание`;
 
     console.log('📤 Sending to Telegram...');
 
@@ -115,7 +106,7 @@ if (allowedOrigins.includes(origin)) {
         message: 'Заявка успешно отправлена в Telegram' 
       });
     } else {
-      // Откатываем создание заявки при ошибке
+
       console.log('❌ Telegram API error, rolling back application creation');
       throw new Error(telegramResult.description || 'Telegram API error');
     }
@@ -128,6 +119,7 @@ if (allowedOrigins.includes(origin)) {
     });
   }
 }
+
 
 
 
