@@ -1,11 +1,11 @@
 import { createApplication, debugRedis, redis } from '../lib/vercel-redis-storage.js';
 
-// Глобальная очередь для группировки сообщений
+
 let messageBatch = [];
 let isProcessing = false;
 const BATCH_SIZE = 5;
-const BATCH_DELAY = 10000; // 10 секунд
-const MESSAGE_INTERVAL = 2000; // 2 секунды между сообщениями
+const BATCH_DELAY = 10000; 
+const MESSAGE_INTERVAL = 2000; 
 
 function escapeMarkdown(text) {
   if (!text) return '';
@@ -20,10 +20,9 @@ function escapeMarkdown(text) {
   return escapedText;
 }
 
-// Функция для получения времени по МСК
+
 function getMoscowTime() {
   const now = new Date();
-  // МСК = UTC+3
   const moscowTime = new Date(now.getTime() + (3 * 60 * 60 * 1000));
   return moscowTime.toLocaleString('ru-RU', {
     timeZone: 'Europe/Moscow',
@@ -66,7 +65,7 @@ function createReplyMarkup(applicationId) {
   };
 }
 
-// Функция отправки сообщения
+
 async function sendTelegramMessage(chatId, text, replyMarkup) {
   const payload = {
     chat_id: chatId,
@@ -96,7 +95,7 @@ async function sendTelegramMessage(chatId, text, replyMarkup) {
   return await response.json();
 }
 
-// Добавление сообщения в Redis очередь
+
 async function addToRedisQueue(formData, applicationId, message) {
   const queueItem = {
     formData,
@@ -109,11 +108,11 @@ async function addToRedisQueue(formData, applicationId, message) {
   await redis.rpush('telegram_queue', JSON.stringify(queueItem));
   console.log(`📥 Added message #${applicationId} to Redis queue`);
 
-  // Запускаем обработку очереди
+
   await processQueueIfNeeded();
 }
 
-// Обработка очереди (вызывается периодически)
+
 async function processQueue() {
   const queueLength = await redis.llen('telegram_queue');
   
@@ -124,7 +123,7 @@ async function processQueue() {
 
   console.log(`📦 Processing queue with ${queueLength} messages`);
 
-  // Берем до BATCH_SIZE сообщений из очереди
+
   const messagesToProcess = [];
   for (let i = 0; i < Math.min(BATCH_SIZE, queueLength); i++) {
     const item = await redis.lpop('telegram_queue');
@@ -136,7 +135,7 @@ async function processQueue() {
   if (messagesToProcess.length === 0) return;
 
   try {
-    // Отправляем уведомление о пакете, если сообщений больше 1
+
     if (messagesToProcess.length > 1) {
       const batchNotification = `📦 *ПОЛУЧЕН ПАКЕТ ИЗ ${messagesToProcess.length} ЗАЯВОК*\n\n` +
                                `⏰ *Время \\(МСК\\):* ${escapeMarkdown(getMoscowTime())}\n` +
@@ -150,7 +149,7 @@ async function processQueue() {
       );
     }
 
-    // Отправляем каждое сообщение с задержкой
+
     for (let i = 0; i < messagesToProcess.length; i++) {
       const item = messagesToProcess[i];
       const replyMarkup = createReplyMarkup(item.applicationId);
@@ -161,7 +160,7 @@ async function processQueue() {
         replyMarkup
       );
 
-      // Задержка между сообщениями (кроме последнего)
+
       if (i < messagesToProcess.length - 1) {
         await new Promise(resolve => setTimeout(resolve, MESSAGE_INTERVAL));
       }
@@ -171,10 +170,10 @@ async function processQueue() {
   } catch (error) {
     console.error('💥 Error processing queue:', error);
     
-    // Возвращаем сообщения в очередь с увеличением счетчика попыток
+
     for (const item of messagesToProcess) {
       item.attempts = (item.attempts || 0) + 1;
-      if (item.attempts < 3) { // Максимум 3 попытки
+      if (item.attempts < 3) { 
         await redis.rpush('telegram_queue', JSON.stringify(item));
       } else {
         console.error(`❌ Message #${item.applicationId} failed after 3 attempts`);
@@ -182,7 +181,7 @@ async function processQueue() {
     }
   }
 
-  // Рекурсивно продолжаем обработку, если в очереди еще есть сообщения
+ 
   const remaining = await redis.llen('telegram_queue');
   if (remaining > 0) {
     console.log(`🔄 Continuing queue processing, ${remaining} messages left`);
@@ -190,12 +189,12 @@ async function processQueue() {
   }
 }
 
-// Запуск обработки очереди если нужно
+
 async function processQueueIfNeeded() {
   const isProcessing = await redis.get('queue_processing');
   
   if (!isProcessing) {
-    await redis.setex('queue_processing', 60, 'true'); // Блокировка на 60 секунд
+    await redis.setex('queue_processing', 60, 'true'); 
     
     try {
       await processQueue();
@@ -205,7 +204,7 @@ async function processQueueIfNeeded() {
   }
 }
 
-// Отдельный endpoint для запуска обработки очереди (для cron jobs)
+
 export async function queueHandler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -262,10 +261,10 @@ export default async function handler(req, res) {
 
     console.log('📤 Adding to Redis queue...');
 
-    // Добавляем в Redis очередь
+  
     await addToRedisQueue(formData, applicationId, message);
 
-    // Немедленно отвечаем пользователю
+    
     res.json({ 
       success: true,
       applicationId: applicationId,
@@ -280,3 +279,4 @@ export default async function handler(req, res) {
     });
   }
 }
+
