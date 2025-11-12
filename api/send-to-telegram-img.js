@@ -1,4 +1,4 @@
-// /api/send-to-telegram-img.js
+
 import Busboy from 'busboy';
 
 export const config = {
@@ -8,7 +8,7 @@ export const config = {
 };
 
 export default async function handler(req, res) {
-  // CORS headers
+
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -88,7 +88,7 @@ export default async function handler(req, res) {
             imageSize: imageBuffer?.length
           });
 
-          // Формируем текст сообщения для Telegram
+
           let telegramMessage = '';
           
           if (name) {
@@ -110,11 +110,11 @@ export default async function handler(req, res) {
           let result;
 
           if (imageBuffer) {
-            // Отправка изображения с текстом
+
             const formData = new FormData();
             formData.append('chat_id', chatId);
             
-            // Создаем Blob из buffer
+ 
             const blob = new Blob([imageBuffer], { type: imageInfo.mimetype });
             formData.append('photo', blob, imageInfo.filename);
             
@@ -144,7 +144,7 @@ export default async function handler(req, res) {
               };
             }
           } else if (telegramMessage) {
-            // Отправка только текста
+
             console.log('📨 Sending text to Telegram...');
             const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
               method: 'POST',
