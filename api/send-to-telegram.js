@@ -21,7 +21,7 @@ function createSafeMessage(formData, applicationId) {
     `👤 *Twitch ник:* ${escapedFullName || 'Не указан'}\n` +
     `📞 *Способ связи:* ${formData.contactMethod === 'telegram' ? 'Telegram' : 'Discord'}\n` +
     `💬 *Контакт:* ${escapedContactInfo || 'Не указан'}\n` +
-    `⏰ *Время:* ${escapeMarkdown(new Date().toLocaleString())}\n` +
+    `⏰ *Время:* ${escapeMarkdown(new Date())}\n` +
     `📊 *Статус:* ⏳ Ожидание`;
 
   return message;
@@ -119,6 +119,7 @@ if (allowedOrigins.includes(origin)) {
     });
   }
 }
+
 
 
 
