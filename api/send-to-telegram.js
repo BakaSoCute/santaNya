@@ -16,22 +16,12 @@ function escapeMarkdown(text) {
 function createSafeMessage(formData, applicationId) {
   const escapedFullName = escapeMarkdown(formData.fullName);
   const escapedContactInfo = escapeMarkdown(formData.contactInfo);
-  const options = {
-  year: 'numeric',
-  month: 'long',
-  day: 'numeric',
-  weekday: 'long',
-  timezone: 'UTC',
-  hour: 'numeric',
-  minute: 'numeric',
-  second: 'numeric'
-};
+
   
   const message = `🎁 *НОВАЯ ЗАЯВКА \\#${applicationId}*\n\n` +
     `👤 *Twitch ник:* ${escapedFullName || 'Не указан'}\n` +
     `📞 *Способ связи:* ${formData.contactMethod === 'telegram' ? 'Telegram' : 'Discord'}\n` +
     `💬 *Контакт:* ${escapedContactInfo || 'Не указан'}\n` +
-    `⏰ *Время:* ${escapeMarkdown(new Date().toLocaleString("ru", options))}\n` +
     `📊 *Статус:* ⏳ Ожидание`;
 
   return message;
@@ -129,6 +119,7 @@ if (allowedOrigins.includes(origin)) {
     });
   }
 }
+
 
 
 
