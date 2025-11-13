@@ -65,7 +65,7 @@ function createReplyMarkup(applicationId) {
   };
 }
 
-
+// Функция отправки сообщения
 async function sendTelegramMessage(chatId, text, replyMarkup) {
   const payload = {
     chat_id: chatId,
@@ -95,7 +95,33 @@ async function sendTelegramMessage(chatId, text, replyMarkup) {
   return await response.json();
 }
 
+// Быстрая обработка одного сообщения (без задержек в основном потоке)
+async function processSingleMessage() {
+  try {
+    const queueLength = await redis.llen('telegram_queue');
+    if (queueLength === 0) return;
 
+    // Берем одно сообщение из очереди
+    const item = await redis.lpop('telegram_queue');
+    if (!item) return;
+
+    const messageData = JSON.parse(item);
+    const replyMarkup = createReplyMarkup(messageData.applicationId);
+    
+    console.log(`📤 Sending single message #${messageData.applicationId}`);
+    await sendTelegramMessage(
+      process.env.TELEGRAM_CHAT_ID,
+      messageData.message,
+      replyMarkup
+    );
+    
+    console.log(`✅ Successfully sent message #${messageData.applicationId}`);
+  } catch (error) {
+    console.error('💥 Error processing single message:', error);
+  }
+}
+
+// Добавление сообщения в Redis очередь
 async function addToRedisQueue(formData, applicationId, message) {
   const queueItem = {
     formData,
@@ -106,117 +132,10 @@ async function addToRedisQueue(formData, applicationId, message) {
   };
 
   await redis.rpush('telegram_queue', JSON.stringify(queueItem));
-  console.log(`📥 Added message #${applicationId} to Redis queue`);
-
-
-  await processQueueIfNeeded();
-}
-
-
-async function processQueue() {
   const queueLength = await redis.llen('telegram_queue');
-  
-  if (queueLength === 0) {
-    console.log('📭 Queue is empty');
-    return;
-  }
+  console.log(`📥 Added message #${applicationId} to Redis queue. Queue size: ${queueLength}`);
 
-  console.log(`📦 Processing queue with ${queueLength} messages`);
-
-
-  const messagesToProcess = [];
-  for (let i = 0; i < Math.min(BATCH_SIZE, queueLength); i++) {
-    const item = await redis.lpop('telegram_queue');
-    if (item) {
-      messagesToProcess.push(JSON.parse(item));
-    }
-  }
-
-  if (messagesToProcess.length === 0) return;
-
-  try {
-
-    if (messagesToProcess.length > 1) {
-      const batchNotification = `📦 *ПОЛУЧЕН ПАКЕТ ИЗ ${messagesToProcess.length} ЗАЯВОК*\n\n` +
-                               `⏰ *Время \\(МСК\\):* ${escapeMarkdown(getMoscowTime())}\n` +
-                               `📋 *Заявки будут обработаны по очереди*\n\n` +
-                               `────────────────────`;
-      
-      await sendTelegramMessage(
-        process.env.TELEGRAM_CHAT_ID,
-        batchNotification,
-        null
-      );
-    }
-
-
-    for (let i = 0; i < messagesToProcess.length; i++) {
-      const item = messagesToProcess[i];
-      const replyMarkup = createReplyMarkup(item.applicationId);
-      
-      await sendTelegramMessage(
-        process.env.TELEGRAM_CHAT_ID,
-        item.message,
-        replyMarkup
-      );
-
-
-      if (i < messagesToProcess.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, MESSAGE_INTERVAL));
-      }
-    }
-
-    console.log(`✅ Successfully processed ${messagesToProcess.length} messages`);
-  } catch (error) {
-    console.error('💥 Error processing queue:', error);
-    
-
-    for (const item of messagesToProcess) {
-      item.attempts = (item.attempts || 0) + 1;
-      if (item.attempts < 3) { 
-        await redis.rpush('telegram_queue', JSON.stringify(item));
-      } else {
-        console.error(`❌ Message #${item.applicationId} failed after 3 attempts`);
-      }
-    }
-  }
-
- 
-  const remaining = await redis.llen('telegram_queue');
-  if (remaining > 0) {
-    console.log(`🔄 Continuing queue processing, ${remaining} messages left`);
-    await processQueue();
-  }
-}
-
-
-async function processQueueIfNeeded() {
-  const isProcessing = await redis.get('queue_processing');
-  
-  if (!isProcessing) {
-    await redis.setex('queue_processing', 60, 'true'); 
-    
-    try {
-      await processQueue();
-    } finally {
-      await redis.del('queue_processing');
-    }
-  }
-}
-
-
-export async function queueHandler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  try {
-    await processQueue();
-    res.json({ success: true, message: 'Queue processed' });
-  } catch (error) {
-    console.error('Error in queue handler:', error);
-    res.status(500).json({ error: 'Queue processing failed' });
-  }
+  return queueLength;
 }
 
 export default async function handler(req, res) {
@@ -261,15 +180,19 @@ export default async function handler(req, res) {
 
     console.log('📤 Adding to Redis queue...');
 
-  
-    await addToRedisQueue(formData, applicationId, message);
+    // Добавляем в Redis очередь
+    const queueLength = await addToRedisQueue(formData, applicationId, message);
 
-    
+    // Немедленно отвечаем пользователю (не ждем отправки в Telegram)
     res.json({ 
       success: true,
       applicationId: applicationId,
-      message: 'Заявка принята в обработку и скоро будет отправлена'
+      message: 'Заявка принята в обработку и скоро будет отправлена',
+      queuePosition: queueLength
     });
+
+    // Запускаем фоновую обработку (не блокируем ответ)
+    processSingleMessage().catch(console.error);
 
   } catch (error) {
     console.error('💥 Error processing application:', error.message);
@@ -279,4 +202,5 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
