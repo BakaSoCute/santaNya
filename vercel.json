@@ -6,12 +6,6 @@
       "use": "@vercel/node"
     }
   ],
-   "crons": [
-    {
-      "path": "/api/process-queue",
-      "schedule": "*/1 * * * *"
-    }
-  ],
   "routes": [
     {
       "src": "/api/(.*)",
@@ -27,4 +21,5 @@
     }
   ]
 }
+
 
