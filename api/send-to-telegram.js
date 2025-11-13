@@ -1,11 +1,13 @@
-import { createApplication, debugRedis, redis } from '../lib/vercel-redis-storage.js';
+import { 
+  createApplication, 
+  debugRedis, 
+  addToTelegramQueue, 
+  getNextFromQueue, 
+  getQueueLength,
+  returnToQueue 
+} from '../lib/vercel-redis-storage.js';
 
-
-let messageBatch = [];
-let isProcessing = false;
-const BATCH_SIZE = 5;
-const BATCH_DELAY = 10000; 
-const MESSAGE_INTERVAL = 2000; 
+const MESSAGE_INTERVAL = 2000;
 
 function escapeMarkdown(text) {
   if (!text) return '';
@@ -19,7 +21,6 @@ function escapeMarkdown(text) {
   
   return escapedText;
 }
-
 
 function getMoscowTime() {
   const now = new Date();
@@ -48,6 +49,7 @@ function createSafeMessage(formData, applicationId) {
 
   return message;
 }
+
 function createReplyMarkup(applicationId) {
   return {
     inline_keyboard: [
@@ -65,7 +67,6 @@ function createReplyMarkup(applicationId) {
   };
 }
 
-// Функция отправки сообщения
 async function sendTelegramMessage(chatId, text, replyMarkup) {
   const payload = {
     chat_id: chatId,
@@ -95,47 +96,57 @@ async function sendTelegramMessage(chatId, text, replyMarkup) {
   return await response.json();
 }
 
-// Быстрая обработка одного сообщения (без задержек в основном потоке)
-async function processSingleMessage() {
+
+async function processQueueBackground() {
   try {
-    const queueLength = await redis.llen('telegram_queue');
+    const queueLength = await getQueueLength();
     if (queueLength === 0) return;
 
-    // Берем одно сообщение из очереди
-    const item = await redis.lpop('telegram_queue');
-    if (!item) return;
+    console.log(`🔄 Background processing ${queueLength} messages from queue`);
+    
+    
+    const maxMessages = Math.min(3, queueLength);
+    
+    for (let i = 0; i < maxMessages; i++) {
+      const messageData = await getNextFromQueue();
+      if (!messageData) break;
 
-    const messageData = JSON.parse(item);
-    const replyMarkup = createReplyMarkup(messageData.applicationId);
-    
-    console.log(`📤 Sending single message #${messageData.applicationId}`);
-    await sendTelegramMessage(
-      process.env.TELEGRAM_CHAT_ID,
-      messageData.message,
-      replyMarkup
-    );
-    
-    console.log(`✅ Successfully sent message #${messageData.applicationId}`);
+      try {
+        const replyMarkup = createReplyMarkup(messageData.applicationId);
+        
+        console.log(`📤 Sending queued message #${messageData.applicationId}`);
+        await sendTelegramMessage(
+          process.env.TELEGRAM_CHAT_ID,
+          messageData.message,
+          replyMarkup
+        );
+        
+        console.log(`✅ Successfully sent queued message #${messageData.applicationId}`);
+        
+        
+        if (i < maxMessages - 1) {
+          await new Promise(resolve => setTimeout(resolve, MESSAGE_INTERVAL));
+        }
+        
+      } catch (error) {
+        console.error(`💥 Failed to send queued message #${messageData.applicationId}:`, error.message);
+        
+        
+        if (messageData.attempts < 3) {
+          await returnToQueue(messageData);
+        } else {
+          console.error(`❌ Message #${messageData.applicationId} failed after 3 attempts`);
+        }
+        
+        if (error.message.includes('Too Many Requests') || error.message.includes('429')) {
+          console.log('⏳ Rate limit hit, stopping background processing');
+          break;
+        }
+      }
+    }
   } catch (error) {
-    console.error('💥 Error processing single message:', error);
+    console.error('💥 Background queue processing error:', error);
   }
-}
-
-// Добавление сообщения в Redis очередь
-async function addToRedisQueue(formData, applicationId, message) {
-  const queueItem = {
-    formData,
-    applicationId,
-    message,
-    timestamp: Date.now(),
-    attempts: 0
-  };
-
-  await redis.rpush('telegram_queue', JSON.stringify(queueItem));
-  const queueLength = await redis.llen('telegram_queue');
-  console.log(`📥 Added message #${applicationId} to Redis queue. Queue size: ${queueLength}`);
-
-  return queueLength;
 }
 
 export default async function handler(req, res) {
@@ -180,10 +191,14 @@ export default async function handler(req, res) {
 
     console.log('📤 Adding to Redis queue...');
 
-    // Добавляем в Redis очередь
-    const queueLength = await addToRedisQueue(formData, applicationId, message);
+    
+    const queueLength = await addToTelegramQueue({
+      formData,
+      applicationId,
+      message
+    });
 
-    // Немедленно отвечаем пользователю (не ждем отправки в Telegram)
+    
     res.json({ 
       success: true,
       applicationId: applicationId,
@@ -191,8 +206,10 @@ export default async function handler(req, res) {
       queuePosition: queueLength
     });
 
-    // Запускаем фоновую обработку (не блокируем ответ)
-    processSingleMessage().catch(console.error);
+    
+    processQueueBackground().catch(error => {
+      console.error('💥 Background processing failed:', error);
+    });
 
   } catch (error) {
     console.error('💥 Error processing application:', error.message);
@@ -202,5 +219,3 @@ export default async function handler(req, res) {
     });
   }
 }
-
-
