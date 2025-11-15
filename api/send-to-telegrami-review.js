@@ -3,20 +3,24 @@ import Busboy from 'busboy';
 export const config = {
   api: {
     bodyParser: false,
+    // Увеличиваем лимит размера для Vercel
+    responseLimit: '50mb',
+    bodySizeLimit: '50mb',
   },
 };
 
+// Вспомогательная функция для CORS
+function setCorsHeaders(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+}
+
 export default async function handler(req, res) {
-const allowedOrigins = [
-  'https://www.nyamuras-santa.ru',
-  'http://localhost:5173'
-];
-const origin = req.headers.origin;
-if (allowedOrigins.includes(origin)) {
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  }
+  // Устанавливаем CORS заголовки для всех запросов
+  setCorsHeaders(res);
+
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -30,10 +34,17 @@ if (allowedOrigins.includes(origin)) {
     const chatId = process.env.TELEGRAM_CHAT_ID_REVIEW;
 
     if (!botToken || !chatId) {
-      return res.status(200).json({ success: false, error: 'Telegram configuration missing' });
+      return res.status(500).json({ success: false, error: 'Telegram configuration missing' });
     }
 
-    const busboy = Busboy({ headers: req.headers });
+    const busboy = Busboy({ 
+      headers: req.headers,
+      limits: {
+        fileSize: 50 * 1024 * 1024, // 50MB лимит для файлов
+        fields: 10, // максимум 10 полей
+        files: 1, // максимум 1 файл
+      }
+    });
     
     let text = '';
     let name = '';
@@ -43,7 +54,7 @@ if (allowedOrigins.includes(origin)) {
     let mediaInfo = null;
     let mediaType = '';
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       busboy.on('field', (fieldname, val) => {
         console.log('📝 Field:', fieldname, val);
         
@@ -72,7 +83,7 @@ if (allowedOrigins.includes(origin)) {
           const chunks = [];
           mediaInfo = { filename, mimetype };
           
-         
+          // Определяем тип медиа если не передан из формы
           if (!mediaType) {
             mediaType = mimetype.startsWith('video/') ? 'video' : 'image';
           }
@@ -84,6 +95,15 @@ if (allowedOrigins.includes(origin)) {
           file.on('end', () => {
             mediaBuffer = Buffer.concat(chunks);
             console.log('✅ Media loaded:', mediaBuffer.length, 'bytes, type:', mediaType);
+          });
+
+          file.on('limit', () => {
+            console.error('❌ File size limit exceeded');
+            res.status(413).json({ 
+              success: false, 
+              error: 'File size too large. Maximum 50MB for video, 10MB for images.' 
+            });
+            reject(new Error('File size limit exceeded'));
           });
         } else {
           file.resume();
@@ -101,6 +121,17 @@ if (allowedOrigins.includes(origin)) {
             mediaType,
             mediaSize: mediaBuffer?.length
           });
+
+          // Проверяем размер файла на сервере
+          if (mediaBuffer) {
+            const maxSize = mediaType === 'video' ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+            if (mediaBuffer.length > maxSize) {
+              return res.status(413).json({
+                success: false,
+                error: `File too large. Maximum ${mediaType === 'video' ? '50MB' : '10MB'} allowed.`
+              });
+            }
+          }
 
           let telegramMessage = '';
           
@@ -122,14 +153,14 @@ if (allowedOrigins.includes(origin)) {
 
           let result;
 
-          
+          // Если есть медиафайл
           if (mediaBuffer && mediaType) {
             const formData = new FormData();
             formData.append('chat_id', chatId);
             
             const blob = new Blob([mediaBuffer], { type: mediaInfo.mimetype });
             
-            
+            // Выбираем метод в зависимости от типа медиа
             const method = mediaType === 'video' ? 'sendVideo' : 'sendPhoto';
             const fieldName = mediaType === 'video' ? 'video' : 'photo';
             
@@ -140,7 +171,7 @@ if (allowedOrigins.includes(origin)) {
               formData.append('parse_mode', 'HTML');
             }
 
-            
+            // Для видео можно добавить дополнительные параметры
             if (mediaType === 'video') {
               formData.append('supports_streaming', 'true');
             }
@@ -160,7 +191,7 @@ if (allowedOrigins.includes(origin)) {
                 message: `✅ Данные и ${mediaType === 'video' ? 'видео' : 'изображение'} отправлены в Telegram!` 
               };
             } else {
-              
+              // Если отправка медиа не удалась, пробуем отправить как документ
               console.log('🔄 Trying to send as document...');
               const documentFormData = new FormData();
               documentFormData.append('chat_id', chatId);
@@ -191,7 +222,7 @@ if (allowedOrigins.includes(origin)) {
               }
             }
           } else if (telegramMessage) {
-            
+            // Отправка только текста
             console.log('📨 Sending text to Telegram...');
             const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
               method: 'POST',
@@ -229,7 +260,7 @@ if (allowedOrigins.includes(origin)) {
 
         } catch (error) {
           console.error('💥 Processing error:', error);
-          res.status(200).json({ 
+          res.status(500).json({ 
             success: false, 
             error: 'Processing error: ' + error.message 
           });
@@ -239,7 +270,7 @@ if (allowedOrigins.includes(origin)) {
 
       busboy.on('error', (error) => {
         console.error('💥 Busboy error:', error);
-        res.status(200).json({ 
+        res.status(500).json({ 
           success: false, 
           error: 'Form data error: ' + error.message 
         });
@@ -251,7 +282,7 @@ if (allowedOrigins.includes(origin)) {
 
   } catch (error) {
     console.error('💥 Server error:', error);
-    res.status(200).json({ 
+    res.status(500).json({ 
       success: false, 
       error: 'Internal server error: ' + error.message 
     });
