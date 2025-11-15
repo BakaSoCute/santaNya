@@ -1,25 +1,17 @@
 import Busboy from 'busboy';
+import { put } from '@vercel/blob';
 
 export const config = {
   api: {
     bodyParser: false,
-    // Увеличиваем лимит размера для Vercel
-    responseLimit: '50mb',
-    bodySizeLimit: '50mb',
   },
 };
 
-// Вспомогательная функция для CORS
-function setCorsHeaders(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-}
-
 export default async function handler(req, res) {
-  // Устанавливаем CORS заголовки для всех запросов
-  setCorsHeaders(res);
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -37,14 +29,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ success: false, error: 'Telegram configuration missing' });
     }
 
-    const busboy = Busboy({ 
-      headers: req.headers,
-      limits: {
-        fileSize: 50 * 1024 * 1024, // 50MB лимит для файлов
-        fields: 10, // максимум 10 полей
-        files: 1, // максимум 1 файл
-      }
-    });
+    const busboy = Busboy({ headers: req.headers });
     
     let text = '';
     let name = '';
@@ -54,7 +39,7 @@ export default async function handler(req, res) {
     let mediaInfo = null;
     let mediaType = '';
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       busboy.on('field', (fieldname, val) => {
         console.log('📝 Field:', fieldname, val);
         
@@ -83,7 +68,6 @@ export default async function handler(req, res) {
           const chunks = [];
           mediaInfo = { filename, mimetype };
           
-          // Определяем тип медиа если не передан из формы
           if (!mediaType) {
             mediaType = mimetype.startsWith('video/') ? 'video' : 'image';
           }
@@ -95,15 +79,6 @@ export default async function handler(req, res) {
           file.on('end', () => {
             mediaBuffer = Buffer.concat(chunks);
             console.log('✅ Media loaded:', mediaBuffer.length, 'bytes, type:', mediaType);
-          });
-
-          file.on('limit', () => {
-            console.error('❌ File size limit exceeded');
-            res.status(413).json({ 
-              success: false, 
-              error: 'File size too large. Maximum 50MB for video, 10MB for images.' 
-            });
-            reject(new Error('File size limit exceeded'));
           });
         } else {
           file.resume();
@@ -122,68 +97,38 @@ export default async function handler(req, res) {
             mediaSize: mediaBuffer?.length
           });
 
-          // Проверяем размер файла на сервере
-          if (mediaBuffer) {
-            const maxSize = mediaType === 'video' ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
-            if (mediaBuffer.length > maxSize) {
-              return res.status(413).json({
-                success: false,
-                error: `File too large. Maximum ${mediaType === 'video' ? '50MB' : '10MB'} allowed.`
-              });
-            }
-          }
-
           let telegramMessage = '';
           
-          if (name) {
-            telegramMessage += `👤 <b>Имя:</b> ${name}\n`;
-          }
-          
-          if (typeContact) {
-            telegramMessage += `📞 <b>Тип связи:</b> ${typeContact}\n`;
-          }
-          
-          if (contact) {
-            telegramMessage += `💬 <b>Контакт:</b> ${contact}\n`;
-          }
-          
-          if (text) {
-            telegramMessage += `\n📝 <b>Сообщение:</b>\n${text}`;
-          }
+          if (name) telegramMessage += `👤 <b>Имя:</b> ${name}\n`;
+          if (typeContact) telegramMessage += `📞 <b>Тип связи:</b> ${typeContact}\n`;
+          if (contact) telegramMessage += `💬 <b>Контакт:</b> ${contact}\n`;
+          if (text) telegramMessage += `\n📝 <b>Сообщение:</b>\n${text}`;
 
           let result;
 
-          // Если есть медиафайл
           if (mediaBuffer && mediaType) {
-            const formData = new FormData();
-            formData.append('chat_id', chatId);
-            
-            const blob = new Blob([mediaBuffer], { type: mediaInfo.mimetype });
-            
-            // Выбираем метод в зависимости от типа медиа
-            const method = mediaType === 'video' ? 'sendVideo' : 'sendPhoto';
-            const fieldName = mediaType === 'video' ? 'video' : 'photo';
-            
-            formData.append(fieldName, blob, mediaInfo.filename);
-            
-            if (telegramMessage) {
-              formData.append('caption', telegramMessage);
-              formData.append('parse_mode', 'HTML');
-            }
+            // Загружаем файл в Vercel Blob
+            const blob = await put(`media-${Date.now()}-${mediaInfo.filename}`, mediaBuffer, {
+              access: 'public',
+              contentType: mediaInfo.mimetype
+            });
 
-            // Для видео можно добавить дополнительные параметры
-            if (mediaType === 'video') {
-              formData.append('supports_streaming', 'true');
-            }
+            console.log('📁 File uploaded to blob:', blob.url);
 
-            console.log(`📨 Sending ${mediaType} to Telegram via ${method}...`);
-            const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
+            // Отправляем ссылку в Telegram
+            const messageWithLink = `${telegramMessage}\n\n📎 <b>Файл:</b> ${blob.url}`;
+            
+            const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
               method: 'POST',
-              body: formData
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: chatId,
+                text: messageWithLink,
+                parse_mode: 'HTML'
+              })
             });
 
             const telegramResult = await telegramResponse.json();
-            console.log('📬 Telegram response:', telegramResult);
 
             if (telegramResponse.ok) {
               result = { 
@@ -191,39 +136,13 @@ export default async function handler(req, res) {
                 message: `✅ Данные и ${mediaType === 'video' ? 'видео' : 'изображение'} отправлены в Telegram!` 
               };
             } else {
-              // Если отправка медиа не удалась, пробуем отправить как документ
-              console.log('🔄 Trying to send as document...');
-              const documentFormData = new FormData();
-              documentFormData.append('chat_id', chatId);
-              documentFormData.append('document', blob, mediaInfo.filename);
-              
-              if (telegramMessage) {
-                documentFormData.append('caption', telegramMessage);
-                documentFormData.append('parse_mode', 'HTML');
-              }
-
-              const documentResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
-                method: 'POST',
-                body: documentFormData
-              });
-
-              const documentResult = await documentResponse.json();
-              
-              if (documentResponse.ok) {
-                result = { 
-                  success: true, 
-                  message: '✅ Данные и файл отправлены в Telegram!' 
-                };
-              } else {
-                result = { 
-                  success: false, 
-                  error: telegramResult.description || documentResult.description || `Ошибка отправки ${mediaType === 'video' ? 'видео' : 'изображения'}` 
-                };
-              }
+              result = { 
+                success: false, 
+                error: telegramResult.description || 'Ошибка отправки в Telegram' 
+              };
             }
           } else if (telegramMessage) {
             // Отправка только текста
-            console.log('📨 Sending text to Telegram...');
             const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -235,7 +154,6 @@ export default async function handler(req, res) {
             });
 
             const telegramResult = await telegramResponse.json();
-            console.log('📬 Telegram response:', telegramResult);
 
             if (telegramResponse.ok) {
               result = { 
