@@ -1,5 +1,4 @@
 import Busboy from 'busboy';
-import { put } from '@vercel/blob';
 
 export const config = {
   api: {
@@ -8,7 +7,6 @@ export const config = {
 };
 
 export default async function handler(req, res) {
-  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -26,7 +24,7 @@ export default async function handler(req, res) {
     const chatId = process.env.TELEGRAM_CHAT_ID_REVIEW;
 
     if (!botToken || !chatId) {
-      return res.status(500).json({ success: false, error: 'Telegram configuration missing' });
+      return res.status(200).json({ success: false, error: 'Telegram configuration missing' });
     }
 
     const busboy = Busboy({ headers: req.headers });
@@ -35,9 +33,8 @@ export default async function handler(req, res) {
     let name = '';
     let typeContact = '';
     let contact = '';
-    let mediaBuffer = null;
-    let mediaInfo = null;
-    let mediaType = '';
+    let imageBuffer = null;
+    let imageInfo = null;
 
     return new Promise((resolve) => {
       busboy.on('field', (fieldname, val) => {
@@ -56,29 +53,22 @@ export default async function handler(req, res) {
           case 'contact':
             contact = val;
             break;
-          case 'mediaType':
-            mediaType = val;
-            break;
         }
       });
 
       busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
-        if (fieldname === 'media') {
-          console.log('📸 Processing media:', filename, 'type:', mimetype);
+        if (fieldname === 'image') {
+          console.log('📸 Processing image:', filename);
           const chunks = [];
-          mediaInfo = { filename, mimetype };
-          
-          if (!mediaType) {
-            mediaType = mimetype.startsWith('video/') ? 'video' : 'image';
-          }
+          imageInfo = { filename, mimetype };
           
           file.on('data', (chunk) => {
             chunks.push(chunk);
           });
 
           file.on('end', () => {
-            mediaBuffer = Buffer.concat(chunks);
-            console.log('✅ Media loaded:', mediaBuffer.length, 'bytes, type:', mediaType);
+            imageBuffer = Buffer.concat(chunks);
+            console.log('✅ Image loaded:', imageBuffer.length, 'bytes');
           });
         } else {
           file.resume();
@@ -92,57 +82,68 @@ export default async function handler(req, res) {
             name,
             typeContact,
             contact,
-            hasMedia: !!mediaBuffer,
-            mediaType,
-            mediaSize: mediaBuffer?.length
+            hasImage: !!imageBuffer,
+            imageSize: imageBuffer?.length
           });
+
 
           let telegramMessage = '';
           
-          if (name) telegramMessage += `👤 <b>Имя:</b> ${name}\n`;
-          if (typeContact) telegramMessage += `📞 <b>Тип связи:</b> ${typeContact}\n`;
-          if (contact) telegramMessage += `💬 <b>Контакт:</b> ${contact}\n`;
-          if (text) telegramMessage += `\n📝 <b>Сообщение:</b>\n${text}`;
+          if (name) {
+            telegramMessage += `👤 <b>Имя:</b> ${name}\n`;
+          }
+          
+          if (typeContact) {
+            telegramMessage += `📞 <b>Тип связи:</b> ${typeContact}\n`;
+          }
+          
+          if (contact) {
+            telegramMessage += `💬 <b>Контакт:</b> ${contact}\n`;
+          }
+          
+          if (text) {
+            telegramMessage += `\n📝 <b>Сообщение:</b>\n${text}`;
+          }
 
           let result;
 
-          if (mediaBuffer && mediaType) {
-            // Загружаем файл в Vercel Blob
-            const blob = await put(`media-${Date.now()}-${mediaInfo.filename}`, mediaBuffer, {
-              access: 'public',
-              contentType: mediaInfo.mimetype
-            });
+          if (imageBuffer) {
 
-            console.log('📁 File uploaded to blob:', blob.url);
-
-            // Отправляем ссылку в Telegram
-            const messageWithLink = `${telegramMessage}\n\n📎 <b>Файл:</b> ${blob.url}`;
+            const formData = new FormData();
+            formData.append('chat_id', chatId);
             
-            const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+  
+            const blob = new Blob([imageBuffer], { type: imageInfo.mimetype });
+            formData.append('photo', blob, imageInfo.filename);
+            
+            if (telegramMessage) {
+              formData.append('caption', telegramMessage);
+              formData.append('parse_mode', 'HTML');
+            }
+
+            console.log('📨 Sending image to Telegram...');
+            const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: chatId,
-                text: messageWithLink,
-                parse_mode: 'HTML'
-              })
+              body: formData
             });
 
             const telegramResult = await telegramResponse.json();
+            console.log('📬 Telegram response:', telegramResult);
 
             if (telegramResponse.ok) {
               result = { 
                 success: true, 
-                message: `✅ Данные и ${mediaType === 'video' ? 'видео' : 'изображение'} отправлены в Telegram!` 
+                message: '✅ Данные и изображение отправлены в Telegram!' 
               };
             } else {
               result = { 
                 success: false, 
-                error: telegramResult.description || 'Ошибка отправки в Telegram' 
+                error: telegramResult.description || 'Ошибка отправки изображения' 
               };
             }
           } else if (telegramMessage) {
-            // Отправка только текста
+ 
+            console.log('📨 Sending text to Telegram...');
             const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -154,6 +155,7 @@ export default async function handler(req, res) {
             });
 
             const telegramResult = await telegramResponse.json();
+            console.log('📬 Telegram response:', telegramResult);
 
             if (telegramResponse.ok) {
               result = { 
@@ -178,7 +180,7 @@ export default async function handler(req, res) {
 
         } catch (error) {
           console.error('💥 Processing error:', error);
-          res.status(500).json({ 
+          res.status(200).json({ 
             success: false, 
             error: 'Processing error: ' + error.message 
           });
@@ -188,7 +190,7 @@ export default async function handler(req, res) {
 
       busboy.on('error', (error) => {
         console.error('💥 Busboy error:', error);
-        res.status(500).json({ 
+        res.status(200).json({ 
           success: false, 
           error: 'Form data error: ' + error.message 
         });
@@ -200,7 +202,7 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('💥 Server error:', error);
-    res.status(500).json({ 
+    res.status(200).json({ 
       success: false, 
       error: 'Internal server error: ' + error.message 
     });
