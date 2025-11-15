@@ -1,4 +1,3 @@
-
 import Busboy from 'busboy';
 
 export const config = {
@@ -34,8 +33,9 @@ export default async function handler(req, res) {
     let name = '';
     let typeContact = '';
     let contact = '';
-    let imageBuffer = null;
-    let imageInfo = null;
+    let mediaBuffer = null;
+    let mediaInfo = null;
+    let mediaType = '';
 
     return new Promise((resolve) => {
       busboy.on('field', (fieldname, val) => {
@@ -54,22 +54,30 @@ export default async function handler(req, res) {
           case 'contact':
             contact = val;
             break;
+          case 'mediaType':
+            mediaType = val;
+            break;
         }
       });
 
       busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
-        if (fieldname === 'image') {
-          console.log('📸 Processing image:', filename);
+        if (fieldname === 'media') {
+          console.log('📸 Processing media:', filename, 'type:', mimetype);
           const chunks = [];
-          imageInfo = { filename, mimetype };
+          mediaInfo = { filename, mimetype };
+          
+         
+          if (!mediaType) {
+            mediaType = mimetype.startsWith('video/') ? 'video' : 'image';
+          }
           
           file.on('data', (chunk) => {
             chunks.push(chunk);
           });
 
           file.on('end', () => {
-            imageBuffer = Buffer.concat(chunks);
-            console.log('✅ Image loaded:', imageBuffer.length, 'bytes');
+            mediaBuffer = Buffer.concat(chunks);
+            console.log('✅ Media loaded:', mediaBuffer.length, 'bytes, type:', mediaType);
           });
         } else {
           file.resume();
@@ -83,10 +91,10 @@ export default async function handler(req, res) {
             name,
             typeContact,
             contact,
-            hasImage: !!imageBuffer,
-            imageSize: imageBuffer?.length
+            hasMedia: !!mediaBuffer,
+            mediaType,
+            mediaSize: mediaBuffer?.length
           });
-
 
           let telegramMessage = '';
           
@@ -108,22 +116,31 @@ export default async function handler(req, res) {
 
           let result;
 
-          if (imageBuffer) {
-
+          
+          if (mediaBuffer && mediaType) {
             const formData = new FormData();
             formData.append('chat_id', chatId);
             
-  
-            const blob = new Blob([imageBuffer], { type: imageInfo.mimetype });
-            formData.append('photo', blob, imageInfo.filename);
+            const blob = new Blob([mediaBuffer], { type: mediaInfo.mimetype });
+            
+            
+            const method = mediaType === 'video' ? 'sendVideo' : 'sendPhoto';
+            const fieldName = mediaType === 'video' ? 'video' : 'photo';
+            
+            formData.append(fieldName, blob, mediaInfo.filename);
             
             if (telegramMessage) {
               formData.append('caption', telegramMessage);
               formData.append('parse_mode', 'HTML');
             }
 
-            console.log('📨 Sending image to Telegram...');
-            const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+            
+            if (mediaType === 'video') {
+              formData.append('supports_streaming', 'true');
+            }
+
+            console.log(`📨 Sending ${mediaType} to Telegram via ${method}...`);
+            const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
               method: 'POST',
               body: formData
             });
@@ -134,16 +151,41 @@ export default async function handler(req, res) {
             if (telegramResponse.ok) {
               result = { 
                 success: true, 
-                message: '✅ Данные и изображение отправлены в Telegram!' 
+                message: `✅ Данные и ${mediaType === 'video' ? 'видео' : 'изображение'} отправлены в Telegram!` 
               };
             } else {
-              result = { 
-                success: false, 
-                error: telegramResult.description || 'Ошибка отправки изображения' 
-              };
+              
+              console.log('🔄 Trying to send as document...');
+              const documentFormData = new FormData();
+              documentFormData.append('chat_id', chatId);
+              documentFormData.append('document', blob, mediaInfo.filename);
+              
+              if (telegramMessage) {
+                documentFormData.append('caption', telegramMessage);
+                documentFormData.append('parse_mode', 'HTML');
+              }
+
+              const documentResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
+                method: 'POST',
+                body: documentFormData
+              });
+
+              const documentResult = await documentResponse.json();
+              
+              if (documentResponse.ok) {
+                result = { 
+                  success: true, 
+                  message: '✅ Данные и файл отправлены в Telegram!' 
+                };
+              } else {
+                result = { 
+                  success: false, 
+                  error: telegramResult.description || documentResult.description || `Ошибка отправки ${mediaType === 'video' ? 'видео' : 'изображения'}` 
+                };
+              }
             }
           } else if (telegramMessage) {
- 
+            
             console.log('📨 Sending text to Telegram...');
             const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
               method: 'POST',
