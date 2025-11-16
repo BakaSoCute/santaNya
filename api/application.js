@@ -1,4 +1,5 @@
 import { getApplication, getAllApplications, debugRedis } from '../lib/vercel-redis-storage.js';
+import { authenticate } from '../middleware/auth.js';
 
 export default async function handler(req, res) {
   console.log('📊 Application API called');
@@ -25,8 +26,8 @@ if (allowedOrigins.includes(origin)) {
   }
 
   try {
-    // const authError = await authenticate(req, res);
-    // if (authError) return authError;
+    const authError = await authenticate(req, res);
+    if (authError) return authError;
     // Диагностика Redis
     await debugRedis();
     
@@ -70,6 +71,7 @@ if (allowedOrigins.includes(origin)) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
+
 
 
 
