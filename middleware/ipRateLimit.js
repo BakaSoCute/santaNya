@@ -4,7 +4,7 @@ export function ipRateLimit(req, res) {
   const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
   const now = Date.now();
   const WINDOW_MS = 60 * 60 * 1000; // 1 час
-  const MAX_REQUESTS = 1; // 10 заявок в час с одного IP
+  const MAX_REQUESTS = 2; // 10 заявок в час с одного IP
   
   if (!ipRequests.has(ip)) {
     ipRequests.set(ip, []);
