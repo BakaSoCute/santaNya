@@ -3,7 +3,8 @@ import axios from 'axios';
 export default async function handler(req, res) {
   // CORS headers
   const allowedOrigins = [
-    'https://www.nyamuras-santa.ru'
+    'https://www.nyamuras-santa.ru',
+    'http://localhost:5173' // для разработки
   ];
   
   const origin = req.headers.origin;
@@ -90,3 +91,4 @@ function parseCookie(cookieHeader) {
     return cookies;
   }, {});
 }
+
