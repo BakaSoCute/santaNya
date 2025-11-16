@@ -9,9 +9,11 @@
     "axios": "^1.6.0",
     "formidable": "^3.5.1",
     "busboy": "^1.6.0",
-    "@vercel/blob": "^2.0.0"
+    "@vercel/blob": "^2.0.0",
+    "joi": "^17.11.0",
   }
 }
+
 
 
 
