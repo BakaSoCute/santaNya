@@ -32,8 +32,7 @@ function createSafeMessage(formData, applicationId) {
 export default async function handler(req, res) {
   console.log('📨 Send to telegram called');
   const allowedOrigins = [
-  'https://www.nyamuras-santa.ru',
-  'http://localhost:5173'
+  'https://www.nyamuras-santa.ru'
 ];
 const origin = req.headers.origin;
 if (allowedOrigins.includes(origin)) {
@@ -119,6 +118,7 @@ if (allowedOrigins.includes(origin)) {
     });
   }
 }
+
 
 
 
