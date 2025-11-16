@@ -25,8 +25,8 @@ if (allowedOrigins.includes(origin)) {
   }
 
   try {
-    const authError = await authenticate(req, res);
-    if (authError) return authError;
+    // const authError = await authenticate(req, res);
+    // if (authError) return authError;
     // Диагностика Redis
     await debugRedis();
     
@@ -70,6 +70,7 @@ if (allowedOrigins.includes(origin)) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
+
 
 
 
