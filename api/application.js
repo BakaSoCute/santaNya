@@ -25,8 +25,11 @@ if (allowedOrigins.includes(origin)) {
   }
 
   try {
+    const authError = await authenticate(req, res);
+    if (authError) return authError;
     // Диагностика Redis
     await debugRedis();
+    
     
     const { searchParams } = new URL(req.url, `http://${req.headers.host}`);
     const id = searchParams.get('id');
@@ -67,6 +70,7 @@ if (allowedOrigins.includes(origin)) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
+
 
 
 
