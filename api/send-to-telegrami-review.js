@@ -1,4 +1,7 @@
 import Busboy from 'busboy';
+import { authenticate } from '../middleware/auth.js';
+import Joi from 'joi';
+import { ipRateLimit } from '../middleware/ipRateLimit.js';
 
 export const config = {
   api: {
@@ -31,6 +34,8 @@ if (allowedOrigins.includes(origin)) {
   }
 
   try {
+    const authError = await authenticate(req, res);
+    if (authError) return authError;
     const botToken = process.env.TELEGRAM_BOT_TOKEN_REVIEW;
     const chatId = process.env.TELEGRAM_CHAT_ID_REVIEW;
 
