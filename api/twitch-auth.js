@@ -70,7 +70,13 @@ export default async function handler(req, res) {
       res.setHeader('Set-Cookie', 
         `twitch_access_token=${tokenResponse.data.access_token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800`
       );
-              console.log('🍪 Cookie set for domain:', req.headers.host);
+              console.log(res.json({
+                user: {
+                  id: userData.id,
+                  login: userData.login,
+                  display_name: userData.display_name,
+                }
+              }));
 
       return res.json({
         user: {
@@ -97,6 +103,7 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
 
 
