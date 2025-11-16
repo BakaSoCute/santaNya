@@ -1,4 +1,5 @@
 import { createApplication, debugRedis } from '../lib/vercel-redis-storage.js';
+import { authenticate } from '../middleware/auth.js';
 import Joi from 'joi';
 import { ipRateLimit } from '../middleware/ipRateLimit.js';
 
@@ -166,6 +167,7 @@ if (allowedOrigins.includes(origin)) {
     });
   }
 }
+
 
 
 
