@@ -1,4 +1,36 @@
 import { createApplication, debugRedis } from '../lib/vercel-redis-storage.js';
+import Joi from 'joi';
+import { ipRateLimit } from '../middleware/ipRateLimit.js';
+
+function createApplicationSchema(twitchUsername = '') {
+  return Joi.object({
+    fullName: Joi.string()
+      .valid(twitchUsername) // 
+      .required()
+      .messages({
+        'any.only': `Имя должно совпадать с вашим Twitch ником: ${twitchUsername}`,
+        'any.required': 'Укажите ваш Twitch ник'
+      }),
+    contactMethod: Joi.string()
+      .valid('telegram', 'discord')
+      .required()
+      .messages({
+        'any.only': 'Выберите способ связи: Telegram или Discord',
+        'any.required': 'Укажите способ связи'
+      }),
+    contactInfo: Joi.string()
+      .min(3)
+      .max(100)
+      .pattern(/^[a-zA-Z0-9_@.+-\s]+$/)
+      .required()
+      .messages({
+        'string.pattern.base': 'Некорректный формат контактных данных',
+        'string.min': 'Контактные данные слишком короткие',
+        'string.max': 'Контактные данные слишком длинные',
+        'any.required': 'Укажите контактные данные'
+      })
+  });
+}
 
 function escapeMarkdown(text) {
   if (!text) return '';
@@ -51,7 +83,24 @@ if (allowedOrigins.includes(origin)) {
   }
 
   try {
+    const authError = await authenticate(req, res);
+    if (authError) return authError;
+
+    const ipLimitError = ipRateLimit(req, res);
+    if (ipLimitError) return ipLimitError;
+
+    const username = req.user?.display_name || req.user?.login || '';
+    const applicationSchema = createApplicationSchema(username);
+    
     const { formData } = req.body;
+    const { error, value } = applicationSchema.validate(req.body.formData);
+    if (error) {
+      console.log('❌ Validation error');
+      return res.status(400).json({ error: 'Invalid input data' });
+    }
+    
+    // Используем ТОЛЬКО валидированные данные
+    const safeFormData = value;
     
     if (!formData) {
       return res.status(400).json({ error: 'No form data provided' });
@@ -59,12 +108,12 @@ if (allowedOrigins.includes(origin)) {
 
     console.log('📨 Received Telegram request:', formData);
 
-    await debugRedis();
+  
     
 
     const application = await createApplication(formData);
     const applicationId = application.id;
-    const message = createSafeMessage(formData, applicationId);
+    const message = createSafeMessage(safeFormData, applicationId);
 
     console.log('📤 Sending to Telegram...');
 
@@ -113,11 +162,11 @@ if (allowedOrigins.includes(origin)) {
   } catch (error) {
     console.error('💥 Error sending to Telegram:', error.message);
     res.status(500).json({ 
-      error: 'Failed to send to Telegram',
-      details: error.message
+      error: 'Failed to send to Telegram'
     });
   }
 }
+
 
 
 
