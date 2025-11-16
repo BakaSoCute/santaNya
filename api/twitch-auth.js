@@ -3,17 +3,18 @@ import axios from 'axios';
 export default async function handler(req, res) {
   console.log('🔐 Twitch auth called');
   
-const allowedOrigins = [
-  'https://www.nyamuras-santa.ru',
-  'http://localhost:5173'
-];
+  const allowedOrigins = [
+    'https://www.nyamuras-santa.ru'
+  ];
+  
   const origin = req.headers.origin;
-if (allowedOrigins.includes(origin)) {
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-}
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+
   if (req.method === 'OPTIONS') {
     console.log('🔄 Handling CORS preflight request');
     return res.status(200).end();
@@ -66,8 +67,12 @@ if (allowedOrigins.includes(origin)) {
       const userData = userResponse.data.data[0];
       console.log('✅ User data received:', userData.display_name);
 
+      res.setHeader('Set-Cookie', 
+        `twitch_access_token=${tokenResponse.data.access_token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800`
+      );
+              console.log('🍪 Cookie set for domain:', req.headers.host);
+
       return res.json({
-        access_token: tokenResponse.data.access_token,
         user: {
           id: userData.id,
           login: userData.login,
@@ -92,10 +97,3 @@ if (allowedOrigins.includes(origin)) {
     });
   }
 }
-
-
-
-
-
-
-
