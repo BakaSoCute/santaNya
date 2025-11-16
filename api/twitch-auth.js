@@ -4,8 +4,7 @@ export default async function handler(req, res) {
   console.log('🔐 Twitch auth called');
   
   const allowedOrigins = [
-    'https://www.nyamuras-santa.ru',
-    'http://localhost:5173' // для разработки
+    'https://www.nyamuras-santa.ru'
   ];
   
   const origin = req.headers.origin;
@@ -98,6 +97,7 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
 
 
