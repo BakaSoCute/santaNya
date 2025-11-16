@@ -3,9 +3,10 @@ import { getApplication, getAllApplications, debugRedis } from '../lib/vercel-re
 export default async function handler(req, res) {
   console.log('📊 Application API called');
   
-const allowedOrigins = [
-  'https://www.nyamuras-santa.ru'
-];
+  const allowedOrigins = [
+    'https://www.nyamuras-santa.ru',
+    'http://localhost:5173' // для разработки
+  ];
   // CORS headers
 const origin = req.headers.origin;
 if (allowedOrigins.includes(origin)) {
@@ -67,6 +68,7 @@ if (allowedOrigins.includes(origin)) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
+
 
 
 
