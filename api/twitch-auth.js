@@ -77,7 +77,7 @@ export default async function handler(req, res) {
        
         if (ua.includes('yabrowser')) {
           console.log("ya browser")
-          return `twitch_access_token=${token}; HttpOnly; Secure;Path=/; Max-Age=604800;Domain=.santa-nya.vercel.app`;
+          return `twitch_access_token=${token}; HttpOnly; Secure;Path=/; Max-Age=604800;`;
         }
         
        
@@ -117,6 +117,7 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
 
 
