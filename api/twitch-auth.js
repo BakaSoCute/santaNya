@@ -82,7 +82,7 @@ export default async function handler(req, res) {
         
        
         if (ua.includes('safari') && !ua.includes('chrome')) {
-          return `twitch_access_token=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`;
+          return `twitch_access_token=${token};Secure; SameSite=Lax; Path=/; Max-Age=604800`;
         }
         
         
@@ -117,6 +117,7 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
 
 
