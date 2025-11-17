@@ -71,16 +71,25 @@ export default async function handler(req, res) {
 
       let cookieOptions=`twitch_access_token=${tokenResponse.data.access_token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800`;
   
+      function getCookieSettings(userAgent, token) {
+        const ua = userAgent.toLowerCase();
+        
+       
+        if (ua.includes('yabrowser')) {
+          return `twitch_access_token=${token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800; Domain=santa-nya.vercel.app`;
+        }
+        
+       
+        if (ua.includes('safari') && !ua.includes('chrome')) {
+          return `twitch_access_token=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`;
+        }
+        
+        
+        return `twitch_access_token=${token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800`;
+      }
       
-      
-      const cookies = [
-        // Основная кука для большинства браузеров
-        `twitch_access_token=${tokenResponse.data.access_token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`,
-        // Дополнительная кука для старых браузеров
-        `twitch_token=${tokenResponse.data.access_token}; HttpOnly; Secure; Path=/; Max-Age=604800`
-      ];
       //`twitch_access_token=${tokenResponse.data.access_token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800`
-      res.setHeader('Set-Cookie', cookieOptions);
+      res.setHeader('Set-Cookie', getCookieSettings(req.headers['user-agent'],tokenResponse.data.access_token));
 
       return res.json({
         user: {
@@ -107,6 +116,7 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
 
 
