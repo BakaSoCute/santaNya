@@ -71,6 +71,7 @@ export default async function handler(req, res) {
 
       let cookieOptions;
       if (isSafari) {
+        console.log("its safari");
         // Для Safari используем SameSite=Lax
         cookieOptions = `twitch_access_token=${tokenResponse.data.access_token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`;
       } else {
@@ -113,6 +114,7 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
 
 
