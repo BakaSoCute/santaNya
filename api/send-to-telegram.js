@@ -87,8 +87,8 @@ if (allowedOrigins.includes(origin)) {
     const authError = await authenticate(req, res);
     if (authError) return authError;
 
-    const application = await findApplicationByName(req.body.formData);
-    if (application) {
+    const applicationName = await findApplicationByName(req.user?.display_name);
+    if (applicationName) {
       return res.status(400).json({ error: 'Заявка от пользователя уже существует' });
     }
 
@@ -173,6 +173,7 @@ if (allowedOrigins.includes(origin)) {
     });
   }
 }
+
 
 
 
