@@ -77,12 +77,12 @@ export default async function handler(req, res) {
        
         if (ua.includes('yabrowser')) {
           console.log("ya browser")
-          return `twitch_access_token=${token}; HttpOnly; Secure;Path=/; Max-Age=604800`;
+          return `twitch_access_token=${token};Secure;Path=/; Max-Age=604800`;
         }
         
        
         if (ua.includes('safari') && !ua.includes('chrome')) {
-          return `twitch_access_token=${token};Secure; SameSite=Lax; Path=/; Max-Age=604800`;
+          return `twitch_access_token=${token};Secure;HttpOnly; SameSite=Lax; Path=/; Max-Age=604800`;
         }
         
         
@@ -117,6 +117,7 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
 
 
