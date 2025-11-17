@@ -66,6 +66,19 @@ export default async function handler(req, res) {
 
       const userData = userResponse.data.data[0];
       console.log('✅ User data received:', userData.display_name);
+
+      const isSafari = /^((?!chrome|android).)*safari/i.test(req.headers['user-agent']);
+
+      let cookieOptions;
+      if (isSafari) {
+        // Для Safari используем SameSite=Lax
+        cookieOptions = `twitch_access_token=${tokenResponse.data.access_token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`;
+      } else {
+        // Для других браузеров SameSite=None
+        cookieOptions = `twitch_access_token=${tokenResponse.data.access_token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800`;
+      }
+      
+      
       const cookies = [
         // Основная кука для большинства браузеров
         `twitch_access_token=${tokenResponse.data.access_token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`,
@@ -73,7 +86,7 @@ export default async function handler(req, res) {
         `twitch_token=${tokenResponse.data.access_token}; HttpOnly; Secure; Path=/; Max-Age=604800`
       ];
       //`twitch_access_token=${tokenResponse.data.access_token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800`
-      res.setHeader('Set-Cookie', cookies);
+      res.setHeader('Set-Cookie', cookieOptions);
 
       return res.json({
         user: {
@@ -100,6 +113,7 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
 
 
