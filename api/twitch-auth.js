@@ -76,7 +76,7 @@ export default async function handler(req, res) {
         cookieOptions = `twitch_access_token=${tokenResponse.data.access_token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800; Domain=nyamuras-santa.ru`;
       } else {
         // Для других браузеров SameSite=None
-        cookieOptions = `twitch_access_token=${tokenResponse.data.access_token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800; Domain=nyamuras-santa.ru`;
+        cookieOptions = `twitch_access_token=${tokenResponse.data.access_token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800`;
       }
       
       
@@ -114,6 +114,7 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
 
 
