@@ -69,15 +69,8 @@ export default async function handler(req, res) {
 
       const isSafari = /^((?!chrome|android).)*safari/i.test(req.headers['user-agent']);
 
-      let cookieOptions;
-      if (isSafari) {
-        console.log("its safari");
-        // Для Safari используем SameSite=Lax
-        cookieOptions = `twitch_access_token=${tokenResponse.data.access_token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800; Domain=process.env.FRONT_URL`;
-      } else {
-        // Для других браузеров SameSite=None
-        cookieOptions = `twitch_access_token=${tokenResponse.data.access_token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800`;
-      }
+      let cookieOptions=`twitch_access_token=${tokenResponse.data.access_token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800`;
+  
       
       
       const cookies = [
@@ -114,6 +107,7 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
 
 
