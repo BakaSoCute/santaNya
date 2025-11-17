@@ -18,7 +18,7 @@ export default async function handler(req, res) {
       status: 'OK',
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'production',
-      cors: 'Enabled for localhost:5173'
+      cors: 'Enabled for https://www.nyamuras-santa.ru'
     });
   }
 
