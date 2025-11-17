@@ -1,4 +1,4 @@
-import { createApplication, debugRedis } from '../lib/vercel-redis-storage.js';
+import { createApplication, debugRedis ,findApplicationByName  } from '../lib/vercel-redis-storage.js';
 import { authenticate } from '../middleware/auth.js';
 import Joi from 'joi';
 import { ipRateLimit } from '../middleware/ipRateLimit.js';
@@ -87,6 +87,12 @@ if (allowedOrigins.includes(origin)) {
     const authError = await authenticate(req, res);
     if (authError) return authError;
 
+    const application = await findApplicationByName(req.body.formData);
+    if (application) {
+      return res.status(400).json({ error: 'Заявка от пользователя уже существует' });
+    }
+
+    
     const ipLimitError = ipRateLimit(req, res);
     if (ipLimitError) return ipLimitError;
 
@@ -112,7 +118,7 @@ if (allowedOrigins.includes(origin)) {
   
     
 
-    const application = await createApplication(formData);
+    const application = await createApplication(formData.fullName);
     const applicationId = application.id;
     const message = createSafeMessage(safeFormData, applicationId);
 
@@ -167,6 +173,7 @@ if (allowedOrigins.includes(origin)) {
     });
   }
 }
+
 
 
 
