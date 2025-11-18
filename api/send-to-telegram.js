@@ -100,7 +100,9 @@ if (allowedOrigins.includes(origin)) {
     const applicationSchema = createApplicationSchema(username);
     
     const { formData } = req.body;
+    console.log(formData);
     const { error, value } = applicationSchema.validate(req.body.formData);
+    console.log(value);
     if (error) {
       console.log('❌ Validation error');
       return res.status(400).json({ error: 'Invalid input data' });
@@ -118,7 +120,7 @@ if (allowedOrigins.includes(origin)) {
   
     
 
-    const application = await createApplication(formData);
+    const application = await createApplication(value);
     const applicationId = application.id;
     const message = createSafeMessage(safeFormData, applicationId);
 
@@ -173,6 +175,7 @@ if (allowedOrigins.includes(origin)) {
     });
   }
 }
+
 
 
 
