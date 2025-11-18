@@ -1,8 +1,9 @@
-import { getApplication, getAllApplications, debugRedis } from '../lib/vercel-redis-storage.js';
+import { getApplication, getAllApplications, debugRedis, findApplicationByName } from '../lib/vercel-redis-storage.js';
 import { authenticate } from '../middleware/auth.js';
 import Joi from 'joi';
 
 const idSchema = Joi.string().pattern(/^\d+$/).max(10);
+const nameSchema = Joi.string().min(2).max(50).pattern(/^[a-zA-Z0-9_]+$/);
 
 export default async function handler(req, res) {
   console.log('📊 Application API called');
@@ -10,15 +11,16 @@ export default async function handler(req, res) {
   const allowedOrigins = [
     'https://www.nyamuras-santa.ru'
   ];
-  // CORS headers
-const origin = req.headers.origin;
-if (allowedOrigins.includes(origin)) {
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-}
-  // Handle OPTIONS request for CORS preflight
+
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  
+
   if (req.method === 'OPTIONS') {
     console.log('🔄 Handling CORS preflight request');
     return res.status(200).end();
@@ -32,15 +34,14 @@ if (allowedOrigins.includes(origin)) {
     const authError = await authenticate(req, res);
     if (authError) return authError;
 
-    
-    
     const { searchParams } = new URL(req.url, `http://${req.headers.host}`);
     const id = searchParams.get('id');
+    const twitchName = searchParams.get('twitchName');
 
-    console.log(`🔍 Application ID requested: ${id}`);
+    console.log(`🔍 Request parameters - ID: ${id}, TwitchName: ${twitchName}`);
+
 
     if (id) {
-      // 7. Валидация ID
       const { error: idError } = idSchema.validate(id);
       if (idError) {
         console.log('❌ Invalid ID format:', id);
@@ -49,7 +50,6 @@ if (allowedOrigins.includes(origin)) {
 
       const applicationId = parseInt(id);
       
-      // 8. Проверка диапазона ID (опционально)
       if (applicationId < 1 || applicationId > 1000000) {
         return res.status(400).json({ error: 'Invalid application ID range' });
       }
@@ -57,7 +57,6 @@ if (allowedOrigins.includes(origin)) {
       const application = await getApplication(applicationId);
       
       if (application) {
-        // 9. Возвращаем только необходимые поля (принцип минимальных привилегий)
         return res.json({ 
           success: true, 
           application: {
@@ -68,16 +67,50 @@ if (allowedOrigins.includes(origin)) {
             createdAt: application.createdAt,
             updatedAt: application.updatedAt,
             processedBy: application.processedBy
-            // Не возвращаем contactInfo если не нужно
           }
         });
       } else {
         console.log(`❌ Application ${id} not found in storage`);
         return res.status(404).json({ error: 'Application not found' });
       }
-    } else {
+    }
+
+    else if (twitchName) {
+      const { error: nameError } = nameSchema.validate(twitchName);
+      if (nameError) {
+        console.log('❌ Invalid Twitch name format:', twitchName);
+        return res.status(400).json({ error: 'Invalid Twitch name format' });
+      }
+
+      console.log(`🔍 Searching application by Twitch name: "${twitchName}"`);
+      const application = await findApplicationByName(twitchName);
+      
+      if (application) {
+
+        return res.json({ 
+          success: true, 
+          application: {
+            id: application.id,
+            status: application.status,
+            twitchName: application.twitchName,
+            createdAt: application.createdAt,
+            updatedAt: application.updatedAt,
+            processedBy: application.processedBy
+
+          }
+        });
+      } else {
+        console.log(`❌ Application for Twitch name "${twitchName}" not found`);
+        return res.json({ 
+          success: true, 
+          application: null,
+          message: 'Application not found' 
+        });
+      }
+    }
+
+    else {
       const applications = await getAllApplications();
-      const limitedApplications = applications.slice(0, 1);
       return res.json({ 
         success: true, 
         applications: applications,
@@ -90,16 +123,3 @@ if (allowedOrigins.includes(origin)) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
