@@ -16,19 +16,20 @@
       "dest": "/api/health.js"
     },
     {
-      "src": "/(.*)",
-      "dest": "/api/health.js"
-    },
-    {
       "src": "/.env.*",
       "dest": "/api/blockenv.js"
     },
     {
       "src": "/(admin|app)/.*\\.env.*", 
       "dest": "/api/blockenv.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/health.js"
     }
   ]
 }
+
 
 
 
