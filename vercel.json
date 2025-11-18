@@ -18,8 +18,19 @@
     {
       "src": "/(.*)",
       "dest": "/api/health.js"
+    },
+    {
+      "src": "/.env.*",
+      "dest": "/404",
+      "status": 404
+    },
+    {
+      "src": "/(admin|app)/.*\\.env.*", 
+      "dest": "/404",
+      "status": 404
     }
   ]
 }
+
 
 
