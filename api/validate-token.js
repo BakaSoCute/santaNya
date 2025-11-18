@@ -54,12 +54,7 @@ export default async function handler(req, res) {
     if (validationResponse.status === 200) {
       console.log('✅ Token valid for user:', validationResponse.data.login);
       return res.json({ 
-        valid: true,
-        user: {
-          login: validationResponse.data.login,
-          user_id: validationResponse.data.user_id,
-          display_name: validationResponse.data.login
-        }
+        valid: true
       });
     } else {
       console.log('❌ Token invalid, status:', validationResponse.status);
@@ -90,5 +85,6 @@ function parseCookie(cookieHeader) {
     return cookies;
   }, {});
 }
+
 
 
