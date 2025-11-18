@@ -21,16 +21,15 @@
     },
     {
       "src": "/.env.*",
-      "dest": "/404",
-      "status": 404
+      "dest": "/api/blockenv.js"
     },
     {
       "src": "/(admin|app)/.*\\.env.*", 
-      "dest": "/404",
-      "status": 404
+      "dest": "/api/blockenv.js"
     }
   ]
 }
+
 
 
 
