@@ -118,7 +118,7 @@ if (allowedOrigins.includes(origin)) {
   
     
 
-    const application = await createApplication(safeFormData);
+    const application = await createApplication(formData);
     const applicationId = application.id;
     const message = createSafeMessage(safeFormData, applicationId);
 
@@ -173,6 +173,7 @@ if (allowedOrigins.includes(origin)) {
     });
   }
 }
+
 
 
 
