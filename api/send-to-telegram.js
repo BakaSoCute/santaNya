@@ -89,6 +89,7 @@ if (allowedOrigins.includes(origin)) {
 
     const applicationName = await findApplicationByName(req.user?.display_name);
     if (applicationName) {
+      console.log(`Заявка от пользователя ${applicationName} уже существует`)
       return res.status(400).json({ error: 'Заявка от пользователя уже существует' });
     }
 
@@ -175,6 +176,7 @@ if (allowedOrigins.includes(origin)) {
     });
   }
 }
+
 
 
 
