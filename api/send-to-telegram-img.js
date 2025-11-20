@@ -1,5 +1,6 @@
 import { authenticate } from '../middleware/auth.js';
 import FormData from 'form-data';
+import { Readable } from 'stream';
 import Joi from 'joi';
 import { ipRateLimit } from '../middleware/ipRateLimit.js';
 import Busboy from 'busboy';
@@ -11,20 +12,16 @@ export const config = {
 };
 
 export default async function handler(req, res) {
-const allowedOrigins = [
-  'https://www.nyamuras-santa.ru'
-];
-const origin = req.headers.origin;
-if (allowedOrigins.includes(origin)) {
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-}
-
-  // res.setHeader('Access-Control-Allow-Origin', '*');
-  // res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  // res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  const allowedOrigins = [
+    'https://www.nyamuras-santa.ru'
+  ];
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -103,7 +100,6 @@ if (allowedOrigins.includes(origin)) {
             imageSize: imageBuffer?.length
           });
 
-
           let telegramMessage = '';
           
           if (name) {
@@ -125,23 +121,27 @@ if (allowedOrigins.includes(origin)) {
           let result;
 
           if (imageBuffer) {
-
-            const formData = new FormData();
-            formData.append('chat_id', chatId);
+            // ✅ ИСПРАВЛЕННЫЙ КОД: Используем ReadableStream для Buffer
+            const form = new FormData();
+            form.append('chat_id', chatId);
             
- 
-            const blob = new Blob([imageBuffer], { type: imageInfo.mimetype });
-            formData.append('photo', blob, imageInfo.filename);
+            // Создаем stream из Buffer
+            const imageStream = Readable.from(imageBuffer);
+            form.append('photo', imageStream, {
+              filename: imageInfo.filename || 'image.jpg',
+              contentType: imageInfo.mimetype || 'image/jpeg'
+            });
             
             if (telegramMessage) {
-              formData.append('caption', telegramMessage);
-              formData.append('parse_mode', 'HTML');
+              form.append('caption', telegramMessage);
+              form.append('parse_mode', 'HTML');
             }
 
             console.log('📨 Sending image to Telegram...');
             const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
               method: 'POST',
-              body: formData
+              body: form,
+              headers: form.getHeaders()
             });
 
             const telegramResult = await telegramResponse.json();
@@ -159,17 +159,7 @@ if (allowedOrigins.includes(origin)) {
               };
             }
           } else if (telegramMessage) {
-
-            // console.log('📨 Sending text to Telegram...');
-            // const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-            //   method: 'POST',
-            //   headers: { 'Content-Type': 'application/json' },
-            //   body: JSON.stringify({
-            //     chat_id: chatId,
-            //     text: telegramMessage,
-            //     parse_mode: 'HTML'
-            //   })
-            // });
+            // ✅ Текстовое сообщение (уже исправлено)
             const params = new URLSearchParams();
             params.append('chat_id', chatId);
             params.append('text', telegramMessage);
