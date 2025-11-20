@@ -2,6 +2,7 @@ import { authenticate } from '../middleware/auth.js';
 import FormData from 'form-data';
 import { Readable } from 'stream';
 import Busboy from 'busboy';
+import axios from 'axios'; // ✅ Добавлен импорт axios
 
 export const config = {
   api: {
@@ -165,9 +166,7 @@ export default async function handler(req, res) {
                 error: error.response?.data?.description || 'Network error: ' + error.message 
               };
             }
-          }
-
-          } else if (telegramMessage) {
+          } else if (telegramMessage) { // ✅ Убрана лишняя закрывающая скобка
             try {
               const params = new URLSearchParams();
               params.append('chat_id', chatId);
@@ -212,7 +211,6 @@ export default async function handler(req, res) {
                 error: 'Network error: ' + fetchError.message 
               };
             }
-
           } else {
             result = { 
               success: false, 
