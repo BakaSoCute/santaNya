@@ -9,7 +9,6 @@ export const config = {
   },
 };
 
-// ✅ Выносим CORS логику в отдельную функцию
 function setCORSHeaders(req, res) {
   const allowedOrigins = [
     'https://www.nyamuras-santa.ru',
@@ -21,7 +20,6 @@ function setCORSHeaders(req, res) {
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   } else {
-    // Для тестирования - разрешите все (потом удалите)
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
   
@@ -32,28 +30,24 @@ function setCORSHeaders(req, res) {
 }
 
 export default async function handler(req, res) {
-  // ✅ Устанавливаем CORS заголовки ДО всего
   setCORSHeaders(req, res);
 
-  // ✅ Обрабатываем OPTIONS запрос
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
   if (req.method !== 'POST') {
-    // ✅ Возвращаем CORS даже для ошибок
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
     const authError = await authenticate(req, res);
     if (authError) {
-      // ✅ Возвращаем CORS даже для ошибок аутентификации
       return res.status(401).json({ error: 'Unauthorized' });
     }
     
-    const botToken = process.env.TELEGRAM_BOT_TOKEN_TEST;
-    const chatId = process.env.TELEGRAM_CHAT_ID_TEST;
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
 
     if (!botToken || !chatId) {
       return res.status(200).json({ success: false, error: 'Telegram configuration missing' });
@@ -128,55 +122,117 @@ export default async function handler(req, res) {
           let result;
 
           if (imageBuffer) {
-            // Упрощенная отправка изображения
-            const form = new FormData();
-            form.append('chat_id', chatId);
-            
-            // Простой вариант без дополнительных параметров
-            const imageStream = Readable.from(imageBuffer);
-            form.append('photo', imageStream, imageInfo.filename || 'image.jpg');
-            
-            if (telegramMessage) {
-              form.append('caption', telegramMessage);
-              form.append('parse_mode', 'HTML');
+            try {
+              console.log('📨 Sending image to Telegram...');
+              
+              // ✅ Упрощенный подход с использованием Buffer напрямую
+              const form = new FormData();
+              form.append('chat_id', chatId);
+              form.append('photo', imageBuffer, {
+                filename: imageInfo.filename || 'image.jpg',
+                contentType: imageInfo.mimetype
+              });
+              
+              if (telegramMessage) {
+                form.append('caption', telegramMessage);
+                form.append('parse_mode', 'HTML');
+              }
+
+              const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+                method: 'POST',
+                body: form,
+                headers: form.getHeaders()
+              });
+
+              // ✅ Безопасный парсинг JSON
+              let telegramResult;
+              try {
+                const responseText = await telegramResponse.text();
+                console.log('📬 Telegram raw response:', responseText);
+                
+                if (responseText.trim() === '') {
+                  telegramResult = { ok: false, description: 'Empty response from Telegram' };
+                } else {
+                  telegramResult = JSON.parse(responseText);
+                }
+              } catch (parseError) {
+                console.error('❌ JSON parse error:', parseError);
+                telegramResult = { ok: false, description: 'Invalid JSON response' };
+              }
+
+              console.log('📬 Telegram parsed response:', telegramResult);
+
+              if (telegramResponse.ok && telegramResult.ok) {
+                result = { 
+                  success: true, 
+                  message: '✅ Данные и изображение отправлены в Telegram!' 
+                };
+              } else {
+                result = { 
+                  success: false, 
+                  error: telegramResult.description || `HTTP ${telegramResponse.status}` 
+                };
+              }
+
+            } catch (fetchError) {
+              console.error('❌ Fetch error:', fetchError);
+              result = { 
+                success: false, 
+                error: 'Network error: ' + fetchError.message 
+              };
             }
 
-            console.log('📨 Sending image to Telegram...');
-            const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
-              method: 'POST',
-              body: form,
-              headers: form.getHeaders()
-            });
-
-            const telegramResult = await telegramResponse.json();
-            console.log('📬 Telegram response:', telegramResult);
-
-            result = telegramResponse.ok ? 
-              { success: true, message: '✅ Данные и изображение отправлены в Telegram!' } :
-              { success: false, error: telegramResult.description || 'Ошибка отправки изображения' };
-
           } else if (telegramMessage) {
-            const params = new URLSearchParams();
-            params.append('chat_id', chatId);
-            params.append('text', telegramMessage);
-            params.append('parse_mode', 'HTML');
+            try {
+              const params = new URLSearchParams();
+              params.append('chat_id', chatId);
+              params.append('text', telegramMessage);
+              params.append('parse_mode', 'HTML');
 
-            console.log('📨 Sending text to Telegram...');
-            const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: params
-            });
+              console.log('📨 Sending text to Telegram...');
+              const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params
+              });
 
-            const telegramResult = await telegramResponse.json();
-            console.log('📬 Telegram response:', telegramResult);
+              // ✅ Безопасный парсинг для текстовых сообщений
+              let telegramResult;
+              try {
+                const responseText = await telegramResponse.text();
+                telegramResult = responseText ? JSON.parse(responseText) : { ok: false };
+              } catch (parseError) {
+                console.error('❌ JSON parse error:', parseError);
+                telegramResult = { ok: false, description: 'Invalid JSON response' };
+              }
 
-            result = telegramResponse.ok ? 
-              { success: true, message: '✅ Данные отправлены в Telegram!' } :
-              { success: false, error: telegramResult.description || 'Ошибка отправки сообщения' };
+              console.log('📬 Telegram response:', telegramResult);
+
+              if (telegramResponse.ok && telegramResult.ok) {
+                result = { 
+                  success: true, 
+                  message: '✅ Данные отправлены в Telegram!' 
+                };
+              } else {
+                result = { 
+                  success: false, 
+                  error: telegramResult.description || 'Ошибка отправки сообщения' 
+                };
+              }
+
+            } catch (fetchError) {
+              console.error('❌ Fetch error:', fetchError);
+              result = { 
+                success: false, 
+                error: 'Network error: ' + fetchError.message 
+              };
+            }
 
           } else {
-            result = { success: false, error: 'Необходимо указать данные для отправки' };
+            result = { 
+              success: false, 
+              error: 'Необходимо указать данные для отправки' 
+            };
           }
 
           res.status(200).json(result);
