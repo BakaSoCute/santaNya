@@ -37,8 +37,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const authError = await authenticate(req, res);
-    if (authError) return authError;
+    // const authError = await authenticate(req, res);
+    // if (authError) return authError;
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
 
