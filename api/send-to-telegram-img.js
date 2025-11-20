@@ -121,42 +121,46 @@ export default async function handler(req, res) {
           let result;
 
           if (imageBuffer) {
-            // ✅ ИСПРАВЛЕННЫЙ КОД: Используем ReadableStream для Buffer
-            const form = new FormData();
-            form.append('chat_id', chatId);
-            
-            // Создаем stream из Buffer
-            const imageStream = Readable.from(imageBuffer);
-            form.append('photo', imageStream, {
-              filename: imageInfo.filename || 'image.jpg',
-              contentType: imageInfo.mimetype || 'image/jpeg'
-            });
-            
-            if (telegramMessage) {
-              form.append('caption', telegramMessage);
-              form.append('parse_mode', 'HTML');
-            }
-
-            console.log('📨 Sending image to Telegram...');
-            const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
-              method: 'POST',
-              body: form,
-              headers: form.getHeaders()
-            });
-
-            const telegramResult = await telegramResponse.json();
-            console.log('📬 Telegram response:', telegramResult);
-
-            if (telegramResponse.ok) {
-              result = { 
-                success: true, 
-                message: '✅ Данные и изображение отправлены в Telegram!' 
-              };
-            } else {
-              result = { 
-                success: false, 
-                error: telegramResult.description || 'Ошибка отправки изображения' 
-              };
+          // ✅ ИСПРАВЛЕННЫЙ КОД: Правильная передача параметров
+          const form = new FormData();
+          form.append('chat_id', chatId);
+          
+          // Создаем stream из Buffer
+          const imageStream = Readable.from(imageBuffer);
+          
+          // ✅ ПРАВИЛЬНО: передаем параметры отдельно
+          form.append('photo', imageStream, {
+            filename: imageInfo.filename || 'image.jpg',
+            contentType: imageInfo.mimetype || 'image/jpeg'
+          });
+          
+          if (telegramMessage) {
+            form.append('caption', telegramMessage);
+            form.append('parse_mode', 'HTML');
+          }
+        
+          console.log('📨 Sending image to Telegram...');
+          const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+            method: 'POST',
+            body: form,
+            headers: form.getHeaders()
+          });
+        
+          const telegramResult = await telegramResponse.json();
+          console.log('📬 Telegram response:', telegramResult);
+        
+          if (telegramResponse.ok) {
+            result = { 
+              success: true, 
+              message: '✅ Данные и изображение отправлены в Telegram!' 
+            };
+          } else {
+            result = { 
+              success: false, 
+              error: telegramResult.description || 'Ошибка отправки изображения' 
+            };
+          }
+        }
             }
           } else if (telegramMessage) {
             // ✅ Текстовое сообщение (уже исправлено)
