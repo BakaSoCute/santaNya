@@ -167,28 +167,6 @@ export default async function handler(req, res) {
             }
           }
 
-              console.log('📬 Telegram parsed response:', telegramResult);
-
-              if (telegramResponse.ok && telegramResult.ok) {
-                result = { 
-                  success: true, 
-                  message: '✅ Данные и изображение отправлены в Telegram!' 
-                };
-              } else {
-                result = { 
-                  success: false, 
-                  error: telegramResult.description || `HTTP ${telegramResponse.status}` 
-                };
-              }
-
-            } catch (fetchError) {
-              console.error('❌ Fetch error:', fetchError);
-              result = { 
-                success: false, 
-                error: 'Network error: ' + fetchError.message 
-              };
-            }
-
           } else if (telegramMessage) {
             try {
               const params = new URLSearchParams();
