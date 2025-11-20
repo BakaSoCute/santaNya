@@ -52,8 +52,8 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
+    const botToken = process.env.TELEGRAM_BOT_TOKEN_TEST;
+    const chatId = process.env.TELEGRAM_CHAT_ID_TEST;
 
     if (!botToken || !chatId) {
       return res.status(200).json({ success: false, error: 'Telegram configuration missing' });
