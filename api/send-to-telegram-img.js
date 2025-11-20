@@ -13,16 +13,21 @@ export const config = {
 
 export default async function handler(req, res) {
   const allowedOrigins = [
-    'https://www.nyamuras-santa.ru'
+    'https://www.nyamuras-santa.ru',
+    'https://nyamuras-santa.ru'
   ];
   const origin = req.headers.origin;
+  
+  // ✅ Всегда устанавливаем CORS заголовки для всех запросов
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
   }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24 часа
 
+  // ✅ Обрабатываем preflight OPTIONS запрос
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
