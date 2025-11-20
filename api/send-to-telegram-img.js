@@ -125,40 +125,47 @@ export default async function handler(req, res) {
             try {
               console.log('📨 Sending image to Telegram...');
               
-              // ✅ Упрощенный подход с использованием Buffer напрямую
               const form = new FormData();
               form.append('chat_id', chatId);
-              form.append('photo', imageBuffer, {
-                filename: imageInfo.filename || 'image.jpg',
-                contentType: imageInfo.mimetype
-              });
+              form.append('photo', imageBuffer, imageInfo.filename || 'image.jpg');
               
               if (telegramMessage) {
                 form.append('caption', telegramMessage);
                 form.append('parse_mode', 'HTML');
               }
-
-              const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
-                method: 'POST',
-                body: form,
-                headers: form.getHeaders()
-              });
-
-              // ✅ Безопасный парсинг JSON
-              let telegramResult;
-              try {
-                const responseText = await telegramResponse.text();
-                console.log('📬 Telegram raw response:', responseText);
-                
-                if (responseText.trim() === '') {
-                  telegramResult = { ok: false, description: 'Empty response from Telegram' };
-                } else {
-                  telegramResult = JSON.parse(responseText);
+          
+              const telegramResponse = await axios.post(
+                `https://api.telegram.org/bot${botToken}/sendPhoto`,
+                form,
+                {
+                  headers: {
+                    ...form.getHeaders(),
+                  },
                 }
-              } catch (parseError) {
-                console.error('❌ JSON parse error:', parseError);
-                telegramResult = { ok: false, description: 'Invalid JSON response' };
+              );
+          
+              console.log('📬 Telegram response:', telegramResponse.data);
+          
+              if (telegramResponse.data.ok) {
+                result = { 
+                  success: true, 
+                  message: '✅ Данные и изображение отправлены в Telegram!' 
+                };
+              } else {
+                result = { 
+                  success: false, 
+                  error: telegramResponse.data.description || 'Ошибка отправки изображения' 
+                };
               }
+          
+            } catch (error) {
+              console.error('❌ Axios error:', error.response?.data || error.message);
+              result = { 
+                success: false, 
+                error: error.response?.data?.description || 'Network error: ' + error.message 
+              };
+            }
+          }
 
               console.log('📬 Telegram parsed response:', telegramResult);
 
