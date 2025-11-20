@@ -1,4 +1,5 @@
 import { authenticate } from '../middleware/auth.js';
+import FormData from 'form-data';
 import Joi from 'joi';
 import { ipRateLimit } from '../middleware/ipRateLimit.js';
 import Busboy from 'busboy';
@@ -159,15 +160,28 @@ if (allowedOrigins.includes(origin)) {
             }
           } else if (telegramMessage) {
 
+            // console.log('📨 Sending text to Telegram...');
+            // const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            //   method: 'POST',
+            //   headers: { 'Content-Type': 'application/json' },
+            //   body: JSON.stringify({
+            //     chat_id: chatId,
+            //     text: telegramMessage,
+            //     parse_mode: 'HTML'
+            //   })
+            // });
+            const params = new URLSearchParams();
+            params.append('chat_id', chatId);
+            params.append('text', telegramMessage);
+            params.append('parse_mode', 'HTML');
+      
             console.log('📨 Sending text to Telegram...');
             const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: chatId,
-                text: telegramMessage,
-                parse_mode: 'HTML'
-              })
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: params
             });
 
             const telegramResult = await telegramResponse.json();
