@@ -13,16 +13,13 @@ export const config = {
 function setCORSHeaders(req, res) {
   const allowedOrigins = [
     'https://www.nyamuras-santa.ru',
-    'https://nyamuras-santa.ru'
   ];
   
   const origin = req.headers.origin;
   
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  }
+  } 
   
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
