@@ -1,5 +1,5 @@
 import { authenticate } from '../middleware/auth.js';
-import rateLimit from '../middleware/rateLimit.js';
+import ipRateLimit from '../middleware/ipRateLimit.js';
 import crypto from 'crypto';
 
 export default async function handler(req, res) {
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     if (authError) return authError;
 
     // ✅ 2. ПРОВЕРКА ЛИМИТОВ ЗАПРОСОВ
-    const rateLimitError = await rateLimit(req, res);
+    const rateLimitError = await ipRateLimit(req, res);
     if (rateLimitError) return rateLimitError;
 
     const { filename, fileSize, fileType, text, name, contact, typeContact } = req.body;
