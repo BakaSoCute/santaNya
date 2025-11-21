@@ -106,7 +106,7 @@ export default async function handler(req, res) {
       success: true,
       sessionId,
       oneTimeToken,
-      uploadUrl: `${process.env.USERBOT_SERVER_URL}/upload-direct`,
+      uploadUrl: `${process.env.USERBOT_SERVER_URL}/upload-album`, 
       userId: req.user.id,
       timestamp,
       expiresIn: '5 minutes'
