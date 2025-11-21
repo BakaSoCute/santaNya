@@ -20,6 +20,14 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  const getTargetChatId = (reqBody) => {
+  // Если это отправка посылки (из формы отправки)
+  if (reqBody.isShipping || reqBody.chatType === 'shipping') {
+    return process.env.TELEGRAM_CHAT_ID; // Чат для отправок
+  }
+  
+  return process.env.TELEGRAM_CHAT_ID_REVIEW;
+};
 
   try {
     // ✅ 1. ПРОВЕРКА АУТЕНТИФИКАЦИИ
@@ -61,7 +69,7 @@ export default async function handler(req, res) {
     if (typeContact) telegramMessage += `📞 <b>Тип связи:</b> ${typeContact}\n`;
     if (contact) telegramMessage += `💬 <b>Контакт:</b> ${contact}\n`;
     if (text) telegramMessage += `\n📝 <b>Сообщение:</b>\n${text}`;
-
+    const chatId = getTargetChatId(req.body);
     // ✅ 8. СОЗДАНИЕ СЕССИИ НА USERBOT СЕРВЕРЕ
     const userBotResponse = await fetch(`${process.env.USERBOT_SERVER_URL}/create-session`, {
       method: 'POST',
@@ -72,7 +80,7 @@ export default async function handler(req, res) {
         sessionId,
         oneTimeToken,
         userId: req.user.id,
-        chatId: process.env.TELEGRAM_CHAT_ID_REVIEW,
+        chatId,
         filename,
         fileSize,
         caption: telegramMessage,
