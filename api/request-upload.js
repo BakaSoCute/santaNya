@@ -72,7 +72,7 @@ export default async function handler(req, res) {
         sessionId,
         oneTimeToken,
         userId: req.user.id,
-        chatId: process.env.TELEGRAM_CHAT_ID,
+        chatId: process.env.TELEGRAM_CHAT_ID_REVIEW,
         filename,
         fileSize,
         caption: telegramMessage,
