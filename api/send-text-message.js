@@ -48,14 +48,14 @@ export default async function handler(req, res) {
     const chatId = getTargetChatId();
 
     if (!chatId) {
-      throw new Error('Chat ID не настроен на сервере');
+      return res.status(500).json({ error: 'Chat ID не настроен на сервере' });
     }
 
     // ✅ 5. ОТПРАВКА ТЕКСТА ЧЕРЕЗ USERBOT СЕРВЕР
     console.log('📤 Sending text message to UserBot server...', {
       chatId: chatId,
       textLength: text.length,
-      chatType: chatType
+      chatType: chatType || 'not specified'
     });
 
     const userBotResponse = await fetch(`${process.env.USERBOT_SERVER_URL}/send-message`, {
@@ -73,11 +73,12 @@ export default async function handler(req, res) {
       let errorMessage = 'Ошибка UserBot сервера';
       try {
         const errorData = await userBotResponse.json();
-        errorMessage = errorData.error || errorData.detail || errorMessage;
+        errorMessage = errorData.detail || errorData.error || errorMessage;
       } catch (e) {
+        // Если не удается распарсить JSON, используем статус текст
         errorMessage = `HTTP ${userBotResponse.status}: ${userBotResponse.statusText}`;
       }
-      throw new Error(`UserBot server error: ${errorMessage}`);
+      throw new Error(errorMessage);
     }
 
     const result = await userBotResponse.json();
@@ -100,13 +101,17 @@ export default async function handler(req, res) {
     
     // Определяем статус код по типу ошибки
     let statusCode = 500;
+    let errorMessage = error.message;
+    
     if (error.message.includes('не настроен') || error.message.includes('не может быть пустым')) {
+      statusCode = 400;
+    } else if (error.message.includes('Missing chatId') || error.message.includes('Missing text')) {
       statusCode = 400;
     }
     
     res.status(statusCode).json({ 
-      error: error.message,
-      success: false
+      success: false,
+      error: errorMessage
     });
   }
 }
