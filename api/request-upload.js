@@ -52,7 +52,7 @@ export default async function handler(req, res) {
     }
 
     // ✅ 5. ПРОВЕРКА ТИПА ФАЙЛА
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'video/mp4'];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'video/mp4', 'text/plain'];
     if (!allowedTypes.includes(fileType)) {
       return res.status(415).json({ error: 'Unsupported file type' });
     }
