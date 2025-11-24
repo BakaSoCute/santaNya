@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   const getTargetChatId = async (reqBody) => {
   // Если это отправка посылки (из формы отправки)
   if (reqBody.isShipping || reqBody.chatType === 'shipping') {
-    await updateApplicationStatusByGift(reqBody.twitchName,"succeses")
+    await updateApplicationStatusByGift(reqBody.name,"succeses")
     return process.env.TELEGRAM_CHAT_ID; // Чат для отправок
   }
   
