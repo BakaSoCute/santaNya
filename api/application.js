@@ -95,7 +95,8 @@ export default async function handler(req, res) {
             twitchName: application.twitchName,
             createdAt: application.createdAt,
             updatedAt: application.updatedAt,
-            processedBy: application.processedBy
+            processedBy: application.processedBy,
+            giftStatus: application.giftStatus
 
           }
         });
