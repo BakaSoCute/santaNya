@@ -1,5 +1,6 @@
 import { authenticate } from '../middleware/auth.js';
 import { ipRateLimit } from '../middleware/ipRateLimit.js';
+import { updateApplicationStatusByGift } from '../lib/vercel-redis-storage.js';
 import crypto from 'crypto';
 
 export default async function handler(req, res) {
@@ -20,9 +21,10 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  const getTargetChatId = (reqBody) => {
+  const getTargetChatId = async (reqBody) => {
   // Если это отправка посылки (из формы отправки)
   if (reqBody.isShipping || reqBody.chatType === 'shipping') {
+    await updateApplicationStatusByGift(reqBody.twitchName,"succeses")
     return process.env.TELEGRAM_CHAT_ID; // Чат для отправок
   }
   
