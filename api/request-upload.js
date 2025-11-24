@@ -71,7 +71,7 @@ export default async function handler(req, res) {
     if (typeContact) telegramMessage += `📞 <b>Тип связи:</b> ${typeContact}\n`;
     if (contact) telegramMessage += `💬 <b>Контакт:</b> ${contact}\n`;
     if (text) telegramMessage += `\n📝 <b>Сообщение:</b>\n${text}`;
-    const chatId = getTargetChatId(req.body);
+    const chatId =  await getTargetChatId(req.body);
     // ✅ 8. СОЗДАНИЕ СЕССИИ НА USERBOT СЕРВЕРЕ
     const userBotResponse = await fetch(`${process.env.USERBOT_SERVER_URL}/create-session`, {
       method: 'POST',
