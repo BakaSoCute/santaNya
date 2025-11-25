@@ -21,11 +21,10 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  const getTargetChatId = async (reqBody) => {
+  const getTargetChatId = (reqBody) => {
   // Если это отправка посылки (из формы отправки)
   if (reqBody.isShipping || reqBody.chatType === 'shipping') {
-    await updateApplicationStatusByGift(reqBody.name,"succeses")
-    return process.env.TELEGRAM_CHAT_ID; // Чат для отправок
+    return process.env.TELEGRAM_CHAT_ID_TEST; // Чат для отправок
   }
   
   return process.env.TELEGRAM_CHAT_ID_REVIEW;
@@ -90,11 +89,15 @@ export default async function handler(req, res) {
         expiresAt
       }),
     });
+    if (userBotResponse.ok && req.body.chatType === 'shipping') {
+      await updateApplicationStatusByGift(req.body.name,"succeses")
+    }
 
     if (!userBotResponse.ok) {
       const error = await userBotResponse.json();
       throw new Error(`UserBot server error: ${error.error}`);
     }
+
 
     // ✅ 9. ЛОГИРОВАНИЕ ДЛЯ АУДИТА
     console.log('Upload session created:', {
