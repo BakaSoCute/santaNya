@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   const getTargetChatId = (reqBody) => {
   // Если это отправка посылки (из формы отправки)
   if (reqBody.isShipping || reqBody.chatType === 'shipping') {
-    return process.env.TELEGRAM_CHAT_ID_TEST; // Чат для отправок
+    return process.env.TELEGRAM_CHAT_ID; // Чат для отправок
   }
   
   return process.env.TELEGRAM_CHAT_ID_REVIEW;
