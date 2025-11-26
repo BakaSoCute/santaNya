@@ -31,17 +31,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    const authError = await authenticate(req, res);
-    if (authError) return authError;
+
 
     const { searchParams } = new URL(req.url, `http://${req.headers.host}`);
     const id = searchParams.get('id');
     const twitchName = searchParams.get('twitchName');
 
+    const authError = await authenticate(req, res, twitchName || null);
+    if (authError) return authError;
+
     console.log(`🔍 Request parameters - ID: ${id}, TwitchName: ${twitchName}`);
 
 
     if (id) {
+      return res.status(404).json({ error: `Application ${id} not found` });
       const { error: idError } = idSchema.validate(id);
       if (idError) {
         console.log('❌ Invalid ID format:', id);

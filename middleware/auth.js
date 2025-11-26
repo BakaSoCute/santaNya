@@ -1,7 +1,7 @@
 // middleware/auth.js
 import axios from 'axios';
 
-export async function authenticate(req, res) {
+export async function authenticate(req, res, twitchName) {
   try {
     // Получаем токен из куки
     const token = req.cookies?.twitch_access_token;
@@ -50,6 +50,13 @@ export async function authenticate(req, res) {
       display_name: userData.display_name,
       profile_image_url: userData.profile_image_url
     };
+
+    if( twitchName && twitchName !== userData.display_name) {
+      return res.status(401).json({ 
+        error: 'Authentication failed',
+        message: 'Unable to verify your session'
+    });
+    }
 
     console.log('✅ User authenticated:', req.user.display_name);
     return null; // Успешная аутентификация
