@@ -92,6 +92,9 @@ export default async function handler(req, res) {
     if (userBotResponse.ok && req.body.chatType === 'shipping') {
       await updateApplicationStatusByGift(req.body.name,"succeses")
     }
+    if (userBotResponse.ok && req.body.chatType === 'review') {
+      await updateApplicationStatusByReview(req.body.name,"succeses")
+    }
 
     if (!userBotResponse.ok) {
       const error = await userBotResponse.json();

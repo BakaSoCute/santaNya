@@ -99,7 +99,8 @@ export default async function handler(req, res) {
             createdAt: application.createdAt,
             updatedAt: application.updatedAt,
             processedBy: application.processedBy,
-            giftStatus: application.giftStatus
+            giftStatus: application.giftStatus,
+            reviewStatus: application.reviewStatus
 
           }
         });
