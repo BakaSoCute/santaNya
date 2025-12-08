@@ -1,6 +1,6 @@
 import { authenticate } from '../middleware/auth.js';
 import { ipRateLimit } from '../middleware/ipRateLimit.js';
-import { updateApplicationStatusByGift } from '../lib/vercel-redis-storage.js';
+import { updateApplicationStatusByGift,updateApplicationStatusByReview } from '../lib/vercel-redis-storage.js';
 import crypto from 'crypto';
 
 export default async function handler(req, res) {
