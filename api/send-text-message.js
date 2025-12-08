@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     const rateLimitError = await ipRateLimit(req, res);
     if (rateLimitError) return rateLimitError;
 
-    const { text, chatType } = req.body;
+    const { text, chatType, name } = req.body;
 
     // ✅ 3. ВАЛИДАЦИЯ ВХОДНЫХ ДАННЫХ
     if (!text || !text.trim()) {
@@ -70,7 +70,7 @@ export default async function handler(req, res) {
       }),
     });
     if (userBotResponse.ok && req.body.chatType === 'review') {
-      await updateApplicationStatusByReview(req.body.name,"succeses")
+      await updateApplicationStatusByReview( name ,"succeses")
     }
 
     if (!userBotResponse.ok) {
