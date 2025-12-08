@@ -93,7 +93,9 @@ export default async function handler(req, res) {
       await updateApplicationStatusByGift(req.body.name,"succeses")
     }
     if (userBotResponse.ok && req.body.chatType === 'review') {
-      await updateApplicationStatusByReview(req.body.name,"succeses")
+      if(req.body.name !== "Анноним") {
+        await updateApplicationStatusByReview(req.body.name,"succeses")
+      }
     }
 
     if (!userBotResponse.ok) {

@@ -70,7 +70,9 @@ export default async function handler(req, res) {
       }),
     });
     if (userBotResponse.ok && req.body.chatType === 'review') {
-      await updateApplicationStatusByReview( name ,"succeses")
+      if (name !== "Анноним") {
+        await updateApplicationStatusByReview( name ,"succeses")
+      }
     }
 
     if (!userBotResponse.ok) {
