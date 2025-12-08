@@ -1,6 +1,6 @@
 import { authenticate } from '../middleware/auth.js';
 import { ipRateLimit } from '../middleware/ipRateLimit.js';
-
+import { updateApplicationStatusByReview } from "../lib/vercel-redis-storage.js"
 export default async function handler(req, res) {
   // CORS headers
   const allowedOrigins = ['https://www.nyamuras-santa.ru', 'https://nyamuras-santa.ru'];
@@ -69,6 +69,9 @@ export default async function handler(req, res) {
         text: text
       }),
     });
+    if (userBotResponse.ok && req.body.chatType === 'review') {
+      await updateApplicationStatusByReview(req.body.name,"succeses")
+    }
 
     if (!userBotResponse.ok) {
       let errorMessage = 'Ошибка UserBot сервера';
